@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "jan": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Jan",
+      "options": {
+        "baseURL": "http://127.0.0.1:1337/v1",
+        "apiKey": "sR8R6J7H35%XSB@b0BdfNFW&j^EXa2kv"
+      },
+      "models": {
+        "gemma-4-E4B-it-IQ4_XS": {
+          "name": "gemma-4-E4B-it-IQ4_XS"
+        }
+      }
+    }
+  }
+}
