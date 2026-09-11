@@ -50,25 +50,25 @@ content.sha256   file → hash manifest for tamper detection
 A buildable, testable solution skeleton with pinned dependencies, configuration and logging — plus a verified local LLM environment (Jan) whose structured-output capability is proven before any agent is built.
 
 **Exit gate:**
-- dotnet build + dotnet test green on a clean machine (empty suites, zero warnings)
+- dotnet build + dotnet test green on a clean machine (all 5 source + 5 test projects present, zero warnings)
 - Probe harness receives schema-valid JSON from the local model on target hardware
-- ADR-001…ADR-008 recorded; Jan runbook verified by a second machine or fresh user profile
+- ADR-001…ADR-010 recorded; Jan runbook verified by a second machine or fresh user profile
 
 #### M0-01 [CS] Solution & project scaffolding  · _Must · S_
 
 As a developer, I want a clean multi-project solution so that engine, world loading, AI, persistence and UI evolve independently and stay testable.
 
-**Design notes & edge cases:** Projects: LifeSim.Core (domain), LifeSim.World (markdown loading), LifeSim.AI (client+agents), LifeSim.Persistence (saves), LifeSim.Console (Spectre UI, entry). Dependency direction is strictly one-way: Console → {AI, World, Persistence} → Core. Core references nothing above it. Central props: net10.0, nullable enable, implicit usings, LANG latest.
+**Design notes & edge cases:** Source projects: LifeSim.Core (domain), LifeSim.World (markdown loading), LifeSim.AI (client+agents), LifeSim.Persistence (saves), LifeSim.Console (Spectre UI, entry). Test projects (one per layer that owns behavior): LifeSim.Core.Tests, LifeSim.World.Tests, LifeSim.AI.Tests, LifeSim.Persistence.Tests, LifeSim.Console.Tests. Dependency direction is strictly one-way: Console → {AI, World, Persistence} → Core. Core references nothing above it — and only the BCL, no third-party packages (configuration contracts live in the owning outer layer; see ADR-009). Central props: net10.0, nullable enable, implicit usings, LANG latest.
 
 **Acceptance criteria:**
-- dotnet build succeeds for all 5 projects with zero warnings
-- Dependency rule enforced (Core has no UI/AI/Spectre references — checked by architecture test)
+- dotnet build succeeds for all source + test projects with zero warnings
+- Dependency rule enforced (Core references only the BCL and itself — checked by architecture test)
 - Directory.Build.props + .editorconfig + .gitignore committed
 
 **Subtasks:**
-- [ ] [CS] Create LifeSim.sln + 5 src projects with one-way project references
-- [ ] [CS] Add xUnit + FluentAssertions test projects for Core, World, AI
-- [ ] [CS] Add Directory.Build.props, .editorconfig, README with build steps
+- [x] [CS] Create LifeSim.sln + 5 src projects with one-way project references
+- [x] [CS] Add xUnit + FluentAssertions test projects for Core, World, AI, Persistence, Console
+- [x] [CS] Add Directory.Build.props, .editorconfig, README with build steps
 
 
 #### M0-02 [CS] Dependency baseline & version pinning  · _Must · S_
@@ -83,8 +83,8 @@ As a developer, I want third-party libraries chosen and pinned in week one so th
 - LICENSE/notice list generated for the docs folder
 
 **Subtasks:**
-- [ ] [CS] Add Directory.Packages.props and pin all versions
-- [ ] [CS] Spike one minimal usage per library and delete the spikes
+- [x] [CS] Add Directory.Packages.props and pin all versions
+- [x] [CS] Spike one minimal usage per library and delete the spikes
 
 _Depends on: M0-01_
 
@@ -92,7 +92,7 @@ _Depends on: M0-01_
 
 As a player, I want one config file (plus env overrides) so I can point the game at my Jan instance and tune model behaviour without recompiling.
 
-**Design notes & edge cases:** appsettings.json shipped with sane defaults; user override at ~/.lifesim/config.json; env vars LIFESIM_* win last. Keys: Llm:Endpoint (default http://127.0.0.1:1337/v1), Llm:Model, per-agent Temperature/MaxTokens/TimeoutSeconds, Ai:Enabled master switch, Paths:Worlds, Paths:Saves, Ui:Theme, Ui:Verbosity. Bound via Microsoft.Extensions.Options with data-annotation validation; startup renders an actionable error panel on invalid config.
+**Design notes & edge cases:** appsettings.json shipped with sane defaults (optional: missing file falls back to full defaults); user override at ~/.lifesim/config.json; env vars LIFESIM_* win last. Keys: Llm:Endpoint (default http://127.0.0.1:1337/v1), Llm:Model, per-agent Temperature/MaxTokens/TimeoutSeconds, Ai:Enabled master switch, Paths:Worlds, Paths:Saves, Ui:Theme, Ui:Verbosity. Option contracts live in LifeSim.Console.Configuration (ADR-009); lower layers receive resolved values, never IOptions. Bound via Microsoft.Extensions.Options with data-annotation validation, including explicit validation of each dictionary entry under Llm:Agents:* (property validation does not descend into dictionaries); startup renders an actionable error panel on invalid config.
 
 **Acceptance criteria:**
 - Missing config file → full defaults; malformed values → named, actionable error panel
@@ -100,9 +100,9 @@ As a player, I want one config file (plus env overrides) so I can point the game
 - Env var override wins over file (documented precedence table)
 
 **Subtasks:**
-- [ ] [CS] Options classes + binding + validation attributes
-- [ ] [CS] Config precedence chain (defaults → file → user file → env)
-- [ ] [CS] Startup validation reporter rendered with Spectre panel
+- [x] [CS] Options classes + binding + validation attributes
+- [x] [CS] Config precedence chain (defaults → file → user file → env)
+- [x] [CS] Startup validation reporter rendered with Spectre panel
 
 _Depends on: M0-01_
 
@@ -110,7 +110,7 @@ _Depends on: M0-01_
 
 As a developer, I want every prompt/response captured to disk so I can debug agent behavior and later build prompt-regression fixtures.
 
-**Design notes & edge cases:** Rolling file log for app events + a separate llm-calls.jsonl: one record per call {correlationId, agent, model, promptHash, latencyMs, finishReason, request, response}. Correlation id minted per turn and flowed through all stages. --verbose flag elevates console logging; rotation caps total disk usage.
+**Design notes & edge cases:** App events go through Serilog (rolling file sink sized + retained; console sink active only when --verbose); configuration under Logging:* (Directory, FileSizeLimitBytes, RetainedFileCount, MaxDirectoryBytes, RedactSensitiveContent). LLM interactions go to a separate append-only llm-calls.jsonl: exactly one record per call {correlationId, agent, model, promptHash, latencyMs, finishReason, success, error, request, response, timestampUtc}, written by an ILlmCallRecorder behind the IChatClient seam (RecordingChatClient over DelegatingChatClient). Streaming calls aggregate into one record. Rotation is size-based with a retained-file cap and a total directory byte budget. Correlation id is minted per turn (LifeSim.Core.Diagnostics.TurnCorrelation) and flowed through all stages; the M1-06 journal stamps it on entries. Logging contracts live in LifeSim.Console.Configuration; the recorder lives in LifeSim.AI behind an interface (ADR-010).
 
 **Acceptance criteria:**
 - Every LLM call produces exactly one JSONL record with the turn correlation id
@@ -118,9 +118,9 @@ As a developer, I want every prompt/response captured to disk so I can debug age
 - Sensitive-content redaction toggle exists (default: off, local app)
 
 **Subtasks:**
-- [ ] [CS] Rolling file logger with size cap + --verbose flag
-- [ ] [CS] LLM call recorder (JSONL) hooked behind the IChatClient seam
-- [ ] [CS] Correlation id minted per turn, stamped on journal entries
+- [x] [CS] Rolling file logger with size cap + --verbose flag
+- [x] [CS] LLM call recorder (JSONL) hooked behind the IChatClient seam
+- [x] [CS] Correlation id minted and flowed per turn (journal stamps it from M1-06)
 
 _Depends on: M0-03_
 
@@ -1366,6 +1366,18 @@ It is tempting to keep adding agent behaviors (economy sim, memory graphs, emoti
 - **Context:** A NuGet-like story for worlds is desirable for 1.0, but remote feeds, signing and updates are not.
 - **Decision:** Deterministic ZIP (.lifeworld) with world.yml + content hashes; install from zip or folder into local libraries; integrity + compatibility gates at install. Remote feeds documented as a post-1.0 candidate.
 - **Rejected alternatives:** NuGet feeds as distribution (rejected for 1.0: hosting + auth complexity); git-based sharing (fine as an author workflow, not a runtime dependency).
+
+### ADR-009 — Configuration contracts live in the owning outer layer (Core stays BCL-only)
+
+- **Context:** M0-01 requires LifeSim.Core to stay the innermost, pure domain layer, while M0-03 introduces application settings (LLM endpoint/model, per-agent tuning, paths, UI theme). An initial cut placed the option classes in Core, which pulled Microsoft.Extensions.Options and UI/AI concerns into the domain and only satisfied the architecture test by accident. Binding, precedence and validation all happen at startup in the Console layer.
+- **Decision:** All application configuration option contracts live in the outermost layer that owns the configuration lifecycle — currently `LifeSim.Console.Configuration` (`LlmOptions`, `AgentModelOptions`, `AiOptions`, `PathsOptions`, `UiOptions`). Inner layers receive resolved primitive/immutable settings via constructor parameters and never depend on `IOptions` or on the config types. Values that world authors tune come from the world package (M2), not static app config. Core references only the BCL and itself.
+- **Rejected alternatives:** Keeping the option classes in Core with an Options package reference (rejected: leaks presentation/AI configuration into the domain and defeats the BCL-only purity gate); a dedicated `LifeSim.Configuration` project (rejected: an extra project and reference graph for a handful of records in a single-process app); defining per-layer option types now (rejected: no inner layer consumes them yet — add narrow records in AI/Persistence only when M4/M6 need them).
+
+### ADR-010 — Serilog for app logging; dedicated JSONL journal for LLM calls
+
+- **Context:** M0-04 needs two different artifacts: a human-readable, size-capped application log, and a machine-consumable record of every LLM interaction for debugging and, later, fixture compilation (M4-06/M9-02). The plan left the writer choice open ("Serilog.Sinks.File or plain rolling writer"). CLI switches must be able to raise verbosity, and content redaction must be possible.
+- **Decision:** Application events use Serilog — `Serilog.Sinks.File` for rolling/size-capped/retained files and `Serilog.Sinks.Console` for `--verbose` output. LLM interactions use a dedicated append-only `llm-calls.jsonl`, written by `JsonlLlmCallRecorder` behind an `ILlmCallRecorder` interface and wrapped around `IChatClient` by `RecordingChatClient` (a `DelegatingChatClient`). One record per call (streaming aggregated) with correlationId/agent/model/promptHash/latencyMs/finishReason/success/error/request/response; size-based rotation plus retained-file and directory-byte caps; redaction toggle default off. Core contributes only the ambient `TurnCorrelation`; it takes no logging dependency.
+- **Rejected alternatives:** A Serilog JSON formatter for LLM calls (rejected: the logging abstraction is human-oriented, and correlation/agent/token fields are first-class in our schema and awkward to query or replay as fixtures); a hand-rolled rolling writer for app logs (rejected: re-implements rotation/retention Serilog.Sinks.File already provides); Microsoft.Extensions.Logging + OpenTelemetry only (rejected: no durable local file sink without extra providers, and tracing is overkill for a single-process local app); in-memory ring buffer (rejected: loses history between sessions and defeats post-hoc debugging).
 
 ## Definition of done (every story, every milestone)
 

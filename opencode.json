@@ -1,5 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": ["skills"]
+  },
   "provider": {
     "jan": {
       "npm": "@ai-sdk/openai-compatible",
