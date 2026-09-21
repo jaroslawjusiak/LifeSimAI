@@ -70,12 +70,17 @@ public sealed class GameLoop
 
         try
         {
-            return RunPipeline(input);
+            var result = RunPipeline(input);
+            State = TurnState.Idle;
+            return result;
         }
         catch (Exception ex)
         {
+            // D3(a): record the stage that actually executed, never a hardcoded stage.
+            var stage = State;
+            JournalStageFailure(stage, ex.Message);
             State = TurnState.Idle;
-            return new TurnResult(TurnState.Idle, false, null, null, string.Empty, [], [new TurnError(TurnState.Applying, ex.Message)]);
+            return new TurnResult(TurnState.Idle, false, null, null, string.Empty, [], [new TurnError(stage, ex.Message)]);
         }
     }
 
@@ -83,37 +88,71 @@ public sealed class GameLoop
     {
         var errors = new List<TurnError>();
 
-        if (!TryTransition(TurnState.InputReceived))
+        if (!TryEnter(TurnState.InputReceived, errors))
         {
-            return new TurnResult(TurnState.Idle, false, null, null, string.Empty, [], errors);
+            return FailedTurn(errors);
         }
 
-        TranslatedCommand command;
+        JournalInput(input);
+
+        if (!TryEnter(TurnState.Translating, errors))
+        {
+            return FailedTurn(errors);
+        }
+
+        // D4: a configured translator that throws is fatal to this turn. The exception escapes
+        // to RunTurn's catch (state is Translating), which returns a typed failure — raw input is
+        // never resolved as an action id. A null translator keeps the documented M1 seam of
+        // treating the input as the action id.
+        var command = Translator is not null ? Translator(input, _world) : new TranslatedCommand(input);
+
+        JournalCommand(command);
+
+        if (!TryEnter(TurnState.Validating, errors))
+        {
+            return FailedTurn(errors);
+        }
+
+        ActionValidation validation;
         try
         {
-            command = Translator is not null ? Translator(input, _world) : new TranslatedCommand(input);
+            validation = ActionResolver.Validate(_world, command.ActionId, command.TargetId);
         }
         catch (Exception ex)
         {
-            errors.Add(new TurnError(TurnState.Translating, ex.Message));
-            command = new TranslatedCommand(input);
+            RecordStageFailure(TurnState.Validating, ex.Message, errors);
+            validation = ActionValidation.Invalid([ex.Message]);
         }
 
-        TryTransition(TurnState.Translating);
-        TryTransition(TurnState.Validating);
+        if (!TryEnter(TurnState.Applying, errors))
+        {
+            return FailedTurn(errors);
+        }
 
         ActionResult actionResult;
-        try
+        if (validation.IsSuccess)
         {
-            actionResult = ActionResolver.Resolve(_world, command.ActionId, command.TargetId);
+            try
+            {
+                actionResult = ActionResolver.Apply(_world, validation, command.TargetId);
+            }
+            catch (Exception ex)
+            {
+                RecordStageFailure(TurnState.Applying, ex.Message, errors);
+                actionResult = ActionResult.Failure(command.ActionId, [ex.Message]);
+            }
         }
-        catch (Exception ex)
+        else
         {
-            errors.Add(new TurnError(TurnState.Applying, ex.Message));
-            actionResult = ActionResult.Failure(command.ActionId, [ex.Message]);
+            // Validation failed: the Applying stage is entered (the state machine is linear) but
+            // its work — the only mutating phase — does not run.
+            actionResult = ActionResult.Failure(command.ActionId, validation.Reasons);
         }
 
-        TryTransition(TurnState.Applying);
+        if (!TryEnter(TurnState.WorldTick, errors))
+        {
+            return FailedTurn(errors);
+        }
 
         try
         {
@@ -121,10 +160,13 @@ public sealed class GameLoop
         }
         catch (Exception ex)
         {
-            errors.Add(new TurnError(TurnState.WorldTick, ex.Message));
+            RecordStageFailure(TurnState.WorldTick, ex.Message, errors);
         }
 
-        TryTransition(TurnState.WorldTick);
+        if (!TryEnter(TurnState.Narrating, errors))
+        {
+            return FailedTurn(errors);
+        }
 
         string narration;
         try
@@ -133,11 +175,14 @@ public sealed class GameLoop
         }
         catch (Exception ex)
         {
-            errors.Add(new TurnError(TurnState.Narrating, ex.Message));
+            RecordStageFailure(TurnState.Narrating, ex.Message, errors);
             narration = string.Empty;
         }
 
-        TryTransition(TurnState.Narrating);
+        if (!TryEnter(TurnState.Options, errors))
+        {
+            return FailedTurn(errors);
+        }
 
         IReadOnlyList<string> options;
         try
@@ -146,12 +191,14 @@ public sealed class GameLoop
         }
         catch (Exception ex)
         {
-            errors.Add(new TurnError(TurnState.Options, ex.Message));
+            RecordStageFailure(TurnState.Options, ex.Message, errors);
             options = [];
         }
 
-        TryTransition(TurnState.Options);
-        TryTransition(TurnState.Idle);
+        if (!TryEnter(TurnState.Idle, errors))
+        {
+            return FailedTurn(errors);
+        }
 
         return new TurnResult(
             TurnState.Idle,
@@ -161,6 +208,58 @@ public sealed class GameLoop
             narration,
             options,
             errors);
+    }
+
+    /// <summary>
+    /// Enters <paramref name="next"/> or, when the transition is refused, records a typed
+    /// failure (D2) so the pipeline stops instead of continuing on a desynced timeline.
+    /// </summary>
+    private bool TryEnter(TurnState next, List<TurnError> errors)
+    {
+        if (TryTransition(next))
+        {
+            return true;
+        }
+
+        RecordStageFailure(State, $"Illegal pipeline transition from '{State}' to '{next}'.", errors);
+        return false;
+    }
+
+    private void RecordStageFailure(TurnState stage, string message, List<TurnError> errors)
+    {
+        errors.Add(new TurnError(stage, message));
+        JournalStageFailure(stage, message);
+    }
+
+    private static TurnResult FailedTurn(IReadOnlyList<TurnError> errors) =>
+        new(TurnState.Idle, false, null, null, string.Empty, [], errors);
+
+    private void JournalInput(string input)
+    {
+        _world.Journal.Append(
+            TurnCorrelation.Current ?? string.Empty,
+            _world.Clock,
+            JournalEntryTypes.RawInput,
+            input);
+    }
+
+    private void JournalCommand(TranslatedCommand command)
+    {
+        var payload = command.TargetId is null ? command.ActionId : $"{command.ActionId} -> {command.TargetId}";
+        _world.Journal.Append(
+            TurnCorrelation.Current ?? string.Empty,
+            _world.Clock,
+            JournalEntryTypes.TranslatedCommand,
+            payload);
+    }
+
+    private void JournalStageFailure(TurnState stage, string message)
+    {
+        _world.Journal.Append(
+            TurnCorrelation.Current ?? string.Empty,
+            _world.Clock,
+            JournalEntryTypes.StageFailed,
+            $"{stage}: {message}");
     }
 
     private void JournalStage(TurnState state)

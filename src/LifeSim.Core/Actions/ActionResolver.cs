@@ -6,9 +6,24 @@ using LifeSim.Core.Journal;
 namespace LifeSim.Core.Actions;
 
 /// <summary>
-/// Resolves an action against the world. All preconditions and effect references are
-/// validated read-only first; only then are effects, fixed costs and the clock advance
-/// applied — so a failed resolution provably mutates nothing and a successful one is atomic.
+/// The outcome of the read-only validation phase: either the resolved action (ready to apply)
+/// or the ordered, human-readable reasons it cannot run. Engine-internal: the public entry
+/// point stays <see cref="ActionResolver.Resolve"/>.
+/// </summary>
+internal sealed record ActionValidation(bool IsSuccess, ActionDefinition? Action, IReadOnlyList<string> Reasons)
+{
+    public static ActionValidation Valid(ActionDefinition action) => new(true, action, []);
+
+    public static ActionValidation Invalid(IReadOnlyList<string> reasons) => new(false, null, reasons);
+}
+
+/// <summary>
+/// Resolves an action against the world in two phases. <see cref="Validate"/> is read-only:
+/// all preconditions and effect references are evaluated and ordered reasons are returned on
+/// failure, with no domain-state mutation (it records an <see cref="JournalEntryTypes.ActionFailed"/>
+/// history entry so failures are observable). <see cref="Apply"/> then mutates effects, fixed
+/// costs and the clock for a validated action. <see cref="Resolve"/> is the original
+/// validate-then-apply facade; a failed resolution provably mutates nothing.
 /// </summary>
 public static class ActionResolver
 {
@@ -18,13 +33,28 @@ public static class ActionResolver
     /// </summary>
     public static ActionResult Resolve(WorldState world, string actionId, string? targetId = null)
     {
+        var validation = Validate(world, actionId, targetId);
+        return validation.IsSuccess
+            ? Apply(world, validation, targetId)
+            : ActionResult.Failure(actionId, validation.Reasons);
+    }
+
+    /// <summary>
+    /// Read-only validation phase. Returns the resolved action when every requirement and effect
+    /// reference is satisfied; otherwise ordered reasons and no world-state mutation. A failed
+    /// validation appends an <see cref="JournalEntryTypes.ActionFailed"/> entry.
+    /// </summary>
+    internal static ActionValidation Validate(WorldState world, string actionId, string? targetId = null)
+    {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
 
         var action = world.GetAction(actionId);
         if (action is null)
         {
-            return ActionResult.Failure(actionId, [$"Unknown action id '{actionId}'."]);
+            var unknown = new[] { $"Unknown action id '{actionId}'." };
+            JournalFailure(world, actionId, unknown);
+            return ActionValidation.Invalid(unknown);
         }
 
         var failures = new List<string>();
@@ -52,8 +82,27 @@ public static class ActionResolver
 
         if (failures.Count > 0)
         {
-            return ActionResult.Failure(actionId, failures);
+            JournalFailure(world, actionId, failures);
+            return ActionValidation.Invalid(failures);
         }
+
+        return ActionValidation.Valid(action);
+    }
+
+    /// <summary>
+    /// Mutating application phase. Applies effects, fixed costs and the clock advance, then
+    /// journals success. Requires a successful <see cref="Validate"/> result.
+    /// </summary>
+    internal static ActionResult Apply(WorldState world, ActionValidation validation, string? targetId = null)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(validation);
+        if (!validation.IsSuccess || validation.Action is null)
+        {
+            throw new ArgumentException("Only a successful validation can be applied.", nameof(validation));
+        }
+
+        var action = validation.Action;
 
         foreach (var effect in action.Effects)
         {
@@ -91,7 +140,16 @@ public static class ActionResolver
                 world.Clock.DayIndex.ToString(CultureInfo.InvariantCulture));
         }
 
-        return ActionResult.Success(actionId);
+        return ActionResult.Success(action.Id);
+    }
+
+    private static void JournalFailure(WorldState world, string actionId, IReadOnlyList<string> reasons)
+    {
+        world.Journal.Append(
+            TurnCorrelation.Current ?? string.Empty,
+            world.Clock,
+            JournalEntryTypes.ActionFailed,
+            $"{actionId}: {string.Join("; ", reasons)}");
     }
 
     private static bool EvaluateRequirement(WorldState world, ActionRequirement requirement, out string reason)

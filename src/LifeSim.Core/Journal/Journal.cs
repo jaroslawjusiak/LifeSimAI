@@ -16,8 +16,20 @@ public static class JournalEntryTypes
     /// <summary>A stage of the turn pipeline transitioned.</summary>
     public const string StageTransition = "StageTransition";
 
-    /// <summary>An action was resolved successfully.</summary>
+    /// <summary>The raw player input for a turn.</summary>
+    public const string RawInput = "RawInput";
+
+    /// <summary>The translated canonical command for a turn.</summary>
+    public const string TranslatedCommand = "TranslatedCommand";
+
+    /// <summary>An action was resolved successfully. Payload is the bare action id.</summary>
     public const string ActionResolved = "ActionResolved";
+
+    /// <summary>An action failed validation. Payload is the action id and its ordered reasons.</summary>
+    public const string ActionFailed = "ActionFailed";
+
+    /// <summary>A pipeline stage failed. Payload is the stage and the error message.</summary>
+    public const string StageFailed = "StageFailed";
 
     /// <summary>A new day started.</summary>
     public const string DayStarted = "DayStarted";

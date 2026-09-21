@@ -3,6 +3,7 @@ using System.Text;
 using FluentAssertions;
 using LifeSim.Core.Actions;
 using LifeSim.Core.Entities;
+using LifeSim.Core.Journal;
 using LifeSim.Core.Stats;
 using LifeSim.Core.Time;
 using Xunit;
@@ -278,6 +279,31 @@ public class ActionResolverTests
         ActionResolver.Resolve(world, "gym");
 
         world.Unlocks.Should().Contain("gym-membership");
+    }
+
+    // ── Failure journaling (D3) ──────────────────────────────────────────────
+
+    [Fact]
+    public void Resolve_FailedPrecondition_AppendsActionFailedEntry()
+    {
+        var world = BuildWorld(Act("work", [new ActionRequirement.LocationIs("office")]));
+
+        var result = ActionResolver.Resolve(world, "work");
+
+        result.IsSuccess.Should().BeFalse();
+        var entry = world.Journal.ByType(JournalEntryTypes.ActionFailed).Should().ContainSingle().Which;
+        entry.Payload.Should().Contain("work");
+        entry.CorrelationId.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Resolve_SuccessfulAction_DoesNotAppendActionFailedEntry()
+    {
+        var world = BuildWorld(Act("idle"));
+
+        ActionResolver.Resolve(world, "idle");
+
+        world.Journal.ByType(JournalEntryTypes.ActionFailed).Should().BeEmpty();
     }
 
     // ── Atomicity & snapshot equality ────────────────────────────────────────
