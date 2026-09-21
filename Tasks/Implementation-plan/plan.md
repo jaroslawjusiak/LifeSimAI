@@ -54,6 +54,9 @@ A buildable, testable solution skeleton with pinned dependencies, configuration 
 - Probe harness receives schema-valid JSON from the local model on target hardware
 - ADR-001…ADR-010 recorded; Jan runbook verified by a second machine or fresh user profile
 
+> **Exit-gate status (2026-09-21): met except the "second machine or fresh user profile" clause.**
+> See [`correctness-tracker.md`](correctness-tracker.md) V4 and §5(e).
+
 #### M0-01 [CS] Solution & project scaffolding  · _Must · S_
 
 As a developer, I want a clean multi-project solution so that engine, world loading, AI, persistence and UI evolve independently and stay testable.
@@ -165,10 +168,20 @@ _Depends on: M0-05_
 
 A headless, fully unit-tested engine: calendar clock, clamped/decaying stats, entity graph, declarative actions (preconditions → transactional effects), explicit turn state machine and append-only journal — proven on a C#-hardcoded demo world. Zero AI involved.
 
+> **Checkbox status corrections (2026-09-21).** Several M1 subtasks overstated completion. One
+> consistent mechanism is used below and every marked line cites an item in
+> [`correctness-tracker.md`](correctness-tracker.md): **re-opened `[ ]`** — the named deliverable
+> does not exist; **partial `[x]`** — the code exists but the acceptance criterion is unmet or
+> unproven. No scope, acceptance criterion or story id changed.
+
 **Exit gate:**
 - Scripted 7-day simulation runs end-to-end in an integration test
 - Failing preconditions provably mutate nothing (snapshot-equality tests)
 - Every clock rollover, stat clamp and threshold event covered by unit tests
+
+> **Exit-gate status (2026-09-21): not passed.** The re-opened/partial subtasks in this milestone
+> and tracker items D1–D12 / V1–V4 are open; see
+> [`correctness-tracker.md`](correctness-tracker.md).
 
 #### M1-01 [CS] Game clock & calendar  · _Must · M_
 
@@ -183,7 +196,7 @@ As the engine, I need one authoritative time source (day of week, hour, day phas
 
 **Subtasks:**
 - [x] [CS] GameClock value type + DayPhase enum + Advance API
-- [x] [CS] Internal event dispatcher publishing HourPassed/DayStarted
+- [x] [CS] Internal event dispatcher publishing HourPassed/DayStarted — _partial (D12: dispatcher has zero call sites)._
 - [x] [CS] Rollover/phase unit-test matrix (dozen+ cases)
 
 
@@ -201,7 +214,7 @@ As the engine, I need clamped stats (energy, hunger, mood, hygiene, health, stre
 **Subtasks:**
 - [x] [CS] StatSet + StatDef model with decay application on HourPassed
 - [x] [CS] Threshold detector with once-per-crossing semantics
-- [x] [CS] Consequence hooks (pass-out, starvation) + tests
+- [ ] [CS] Consequence hooks (pass-out, starvation) + tests — _re-opened (D6: pass-out not enforced)._
 
 _Depends on: M1-01_
 
@@ -240,7 +253,7 @@ As the engine, I need declarative actions (costs, preconditions, effects) valida
 - [x] [CS] ActionDefinition + requirement/effect DSL model
 - [x] [CS] Validator pipeline producing ordered failure reasons
 - [x] [CS] Transactional apply + clock advance + journal write
-- [x] [CS] Evaluator tests for every kind (incl. atomicity & clamp interplay)
+- [x] [CS] Evaluator tests for every kind (incl. atomicity & clamp interplay) — _partial (V1: atomicity proof missing)._
 
 _Depends on: M1-03_
 
@@ -257,7 +270,7 @@ As the engine, I need an explicit turn pipeline so UI and AI stages plug into de
 
 **Subtasks:**
 - [x] [CS] GameLoop with stage delegates + TurnResult/TurnError types
-- [x] [CS] Recovery routing (no unhandled exceptions escape the loop)
+- [x] [CS] Recovery routing (no unhandled exceptions escape the loop) — _partial (V2: no Recovery state)._
 - [x] [CS] Headless harness used by integration tests
 
 _Depends on: M1-04_
@@ -274,9 +287,9 @@ As the engine, I need an append-only journal so saves, AI context, debugging and
 - Replay: re-applying the journal from day 0 reproduces the state hash
 
 **Subtasks:**
-- [x] [CS] Journal store (append-only) + typed payload records
+- [ ] [CS] Journal store (append-only) + typed payload records — _re-opened (D7: payload is a string, not typed records)._
 - [x] [CS] Query API + pinned/rolling classification
-- [x] [CS] Replay tool used by tests (state-hash comparison)
+- [x] [CS] Replay tool used by tests (state-hash comparison) — _partial (D7: replay is a special case, not general)._
 
 _Depends on: M1-05_
 
@@ -291,7 +304,7 @@ As a developer, I want a small C#-authored world so the whole engine is exercisa
 - Fixture lives in the test project and runs in milliseconds
 
 **Subtasks:**
-- [x] [CS] DemoWorld builder with entities + actions + one goal
+- [ ] [CS] DemoWorld builder with entities + actions + one goal — _re-opened (D10: no Goal type, no talk action)._
 - [x] [CS] Scripted-strategy playthrough integration test
 
 _Depends on: M1-05_
