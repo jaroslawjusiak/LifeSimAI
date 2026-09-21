@@ -214,7 +214,7 @@ As the engine, I need clamped stats (energy, hunger, mood, hygiene, health, stre
 **Subtasks:**
 - [x] [CS] StatSet + StatDef model with decay application on HourPassed
 - [x] [CS] Threshold detector with once-per-crossing semantics
-- [ ] [CS] Consequence hooks (pass-out, starvation) + tests — _re-opened (D6: pass-out not enforced)._
+- [x] [CS] Consequence hooks (pass-out, starvation) + tests
 
 _Depends on: M1-01_
 
