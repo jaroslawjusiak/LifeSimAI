@@ -70,14 +70,14 @@ the deliverable; **Verify-only** = work is claimed done but unproven. Every evid
 | **D2** | High | `TryTransition` return values are **ignored** at six call sites — a refused transition is silently swallowed and the pipeline continues, so the journal can desync from execution. | `src/LifeSim.Core/Turns/GameLoop.cs`:102, 103, 116, 127, 140, 153, 154 | M1-05 | **M1 exit gate** | developer | **Verified closed — deviation stated.** Independent verification (debugger, 2026-09-21): the six ignored `TryTransition` results are gone (uniform `TryEnter` at every site); discriminator `RunTurn_RefusedTransition_ReturnsTypedFailureAndStopsPipeline` fails pre-fix / passes post-fix; `dotnet build LifeSim.sln --no-incremental` 0/0; `dotnet test LifeSim.sln` 230/230. **Deviation:** the §7 clause "drives each refused/illegal transition" is only *partly* met — only the first transition (`Idle→InputReceived`) is forced; the later `TryEnter` sites are unexercised. This remainder is **not claimed as covered** and is tracked under V2. |
 | **D3** | High | Failure journaling is wrong: **(a)** a failed stage is still journaled as entered; **(b)** the outer catch hardcodes `Applying` for any escaping exception; **(c)** `Failure` returns *before* the journal `Append`, so failed actions, raw input and the translated command are never journaled. | `src/LifeSim.Core/Turns/GameLoop.cs`:75–79, 94–100, 166–173; `src/LifeSim.Core/Actions/ActionResolver.cs`:53–56, 79 | M1-05, M1-06 | **M1 exit gate**; M6 | developer | **Verified closed** — independent (debugger, 2026-09-21): `dotnet build LifeSim.sln --no-incremental` 0/0; `dotnet test LifeSim.sln` 230/230. Discriminator `RunTurn_EscapingException_RecordsRealStageNotApplying` proves the escaping-exception path records the **real** stage (not hardcoded `Applying`); failure / raw-input / translated-command journaling asserted by the GameLoop failure tests. |
 | **D4** | High | Translator failure falls back to **executing raw input as an action id**, and a test enshrines it (`IsSuccess == true`). | `src/LifeSim.Core/Turns/GameLoop.cs`:96–100; `src/LifeSim.Core/Turns/TranslatedCommand.cs`:4; `tests/LifeSim.Core.Tests/GameLoopTests.cs`:55–64 | M1-05, M5-03 | **M1 exit gate** | developer | **Verified closed** — independent (debugger, 2026-09-21): `dotnet build LifeSim.sln --no-incremental` 0/0; `dotnet test LifeSim.sln` 230/230. Discriminator `RunTurn_TranslatorFailure_DoesNotExecuteRawInputAsAction` (raw input is never resolved as an action). `RunTurn_RecoversTranslatorFailure_UsesFallback` assertion changed **and strengthened** (`IsSuccess` now `false`; the old `true` enshrined the D4 defect), justified inline per AGENTS rule 9. Recovery semantics resolved — see [§5(f)](#f-translator-failure-recovery-model--resolved-2026-09-21-not-open). |
-| **D5** | High | Hour decay is **partition-dependent**: `hoursPassed = minutes / 60` per action, so two 30-minute actions yield **zero** decay for a full elapsed hour while one 60-minute action yields one tick; day detection is boundary-based, inconsistent with the chunk count. | `src/LifeSim.Core/Actions/ActionResolver.cs`:73–77; `src/LifeSim.Core/Time/GameClock.cs`:93–94; `src/LifeSim.Core/Time/GameClockEventDispatcher.cs`:25; encoded by `tests/LifeSim.Core.Tests/GameClockTests.cs`:119–127 | M1-01, M1-02 | **M1 exit gate (decay AC)** | developer (ruling: architect) | **Decided — awaiting implementation (ADR-011, 2026-09-21).** Decay is **boundary-based**: `BoundariesCrossed = floor(newTotalMinutes/60) − floor(TotalMinutes/60)`, one tick per HH:00 boundary crossed, partition-independent and stateless. `GameClockTests.cs`:119–127 (`1`→`2`) and `:129–137` (`0`→`1`), plus `GameClockEventDispatcherTests.cs`:26–34 and `:48–59`, are scheduled to change with the reason stated inline per AGENTS rule 9. See [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21). |
-| **D6** | High | `StatConsequence.PassOut` is **reported but never enforced** — no forced sleep, no clock mutation, no mood penalty. Only `Starve` has a consequence. | `src/LifeSim.Core/Stats/StatConsequence.cs`:11–12; `src/LifeSim.Core/Stats/StatSet.cs`:76–101; `tests/LifeSim.Core.Tests/StatSetTests.cs`:44–56; `tests/LifeSim.Core.Tests/DemoWorld.cs`:17; plan.md:194, 199, 204 | M1-02 | **M1 exit gate** | developer | Open |
+| **D5** | High | Hour decay is **partition-dependent**: `hoursPassed = minutes / 60` per action, so two 30-minute actions yield **zero** decay for a full elapsed hour while one 60-minute action yields one tick; day detection is boundary-based, inconsistent with the chunk count. | `src/LifeSim.Core/Actions/ActionResolver.cs`:73–77; `src/LifeSim.Core/Time/GameClock.cs`:93–94; `src/LifeSim.Core/Time/GameClockEventDispatcher.cs`:25; encoded by `tests/LifeSim.Core.Tests/GameClockTests.cs`:119–127 | M1-01, M1-02 | **M1 exit gate (decay AC)** | developer (ruling: architect) | **Verified closed** — independent verification (debugger, 2026-09-21) supersedes the developer self-report; ruled boundary-based by `ADR-011`. Boundary arithmetic independently reproduced: `13:30+90 → BoundariesCrossed 2`, `23:59+1 → 1`, `14:30+60 → 1`, `14:30+30 → 1`, `14:30+29 → 0`; `week=168`, `multi-day=49`, `23:00+120=2` unchanged. **Partition independence proven and discriminating:** the 30+30 partition equals a single 60-min action in **both** `BoundariesCrossed` and total decay (energy 99 both ways); under the old `minutes/60` rule the partition gave `0` ticks, so the new tests **fail pre-fix**. `GameClockTests.cs`:119–127 (`1`→`2`), `:129–137` (`0`→`1`), `GameClockEventDispatcherTests.cs`:26–34 and `:48–59` changed with the reason stated inline per AGENTS rule 9. General gate: `dotnet build LifeSim.sln --no-incremental` → 0 Warning(s), 0 Error(s); `dotnet test LifeSim.sln` → 247 passed / 0 failed / 0 skipped (Core 167, AI 33, Console 45, World 1, Persistence 1), offline confirmed (`FakeChatClient`/stub handlers; no `Skip=`). **Residuals recorded under [§6 Batch 1](#batch-1--simulation-correctness-clockdecay-seam).** See [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21). |
+| **D6** | High | `StatConsequence.PassOut` is **reported but never enforced** — no forced sleep, no clock mutation, no mood penalty. Only `Starve` has a consequence. | `src/LifeSim.Core/Stats/StatConsequence.cs`:11–12; `src/LifeSim.Core/Stats/StatSet.cs`:76–101; `tests/LifeSim.Core.Tests/StatSetTests.cs`:44–56; `tests/LifeSim.Core.Tests/DemoWorld.cs`:17; plan.md:194, 199, 204 | M1-02 | **M1 exit gate** | developer | **Decided — awaiting implementation (ADR-012, 2026-09-21).** Pass-out parameters live in a new `WorldRules` record owned by `WorldState` (defaults: 6 h sleep, −10 mood); `StatDef`/`StatConsequence` are unchanged. The trigger only latches pending; forced sleep is applied **after** the action's advance completes, through the same dispatcher (never from an `HourPassed` handler — re-entrancy per ADR-011). See [§5(g)](#g-d6--pass-out-representation--application--resolved-2026-09-21). **Not fixed** until its closure proof passes. |
 | **D7** | High | The journal is **lossy and not replayable**: `Payload` is `string?` (not the plan's typed payload records); `ActionResolved` drops `targetId`; failed turns and raw input are absent; the replay test passes only because the demo script needs no targets and has no randomness. | `src/LifeSim.Core/Journal/Journal.cs`:35–41; `src/LifeSim.Core/Actions/ActionResolver.cs`:79–83; `tests/LifeSim.Core.Tests/DemoWorldPlaythroughTests.cs`:42–56; plan.md:269, 274, 277 | M1-06 | **M1 exit gate**; M4-04; M6 | architect (payload shape) → developer | Open |
 | **D8** | Decide | `TurnCorrelation.Mint()` uses `Guid.NewGuid()` inside `LifeSim.Core`, and the id is persisted into every journal entry; the state hash **excludes** the journal, which is why no test catches it. Needs a ruling: sanctioned diagnostics exception (with ADR) or a determinism fix. | `src/LifeSim.Core/Diagnostics/TurnCorrelation.cs`:19; `src/LifeSim.Core/Turns/GameLoop.cs`:169; `src/LifeSim.Core/Actions/ActionResolver.cs`:80; `src/LifeSim.Core/Entities/WorldState.cs`:88–89; `src/LifeSim.Core/Diagnostics/StateHasher.cs`:16; `AGENTS.md` §3 rule 4 | determinism principle; M1-06 | **M1 exit gate (journal determinism)** | architect (ruling/ADR) | Open |
 | **D9** | Medium | Location graph is **data-only at runtime**: `Connections` / `RequiresFlag` / `AllowedActionIds` are never read by the resolver, so `Move` teleports to any existing location and any action runs anywhere. The gated-edge AC holds only as a data model. | `src/LifeSim.Core/Entities/Location.cs`:8, 46–49; `src/LifeSim.Core/Actions/ActionResolver.cs` (no read of `Connections` / `AllowedActionIds`); plan.md:217 | M1-03 | M3/M5 option layer if deferred | architect (decision) → developer | Open |
 | **D10** | Medium | DemoWorld drifts from the plan: **7 actions with three `move_*` variants and no `talk`**, while the café advertises `talk` with no matching definition, and **no `Goal` type exists** anywhere. The integration fixture never exercises `Relationship`. | `tests/LifeSim.Core.Tests/DemoWorld.cs`:44–61, 37; no `Goal` type in `src/`; plan.md:287, 294 | M1-07 | **M1 exit gate** | developer | Open |
 | **D11** | Medium | **No debt rule**: `Player.Money` is unclamped and `MoneyCost` is subtracted unconditionally; the plan requires negative money only when world rules enable debt. (A missing `MoneyGte` is *not* a gap — it was never an M1-04 requirement.) | `src/LifeSim.Core/Entities/Player.cs`:46; `src/LifeSim.Core/Actions/ActionResolver.cs`:68–71; plan.md:194; plan.md:231 (requirement list has no `MoneyGte`) | M1-02, M1-04 | **M1 exit gate** | developer | Open |
-| **D12** | Medium | `GameClockEventDispatcher` has **zero call sites** — decay is invoked directly, so the plan's "decay applied on `HourPassed`" seam is a dead object. | `src/LifeSim.Core/Time/GameClockEventDispatcher.cs` (no references in `src/`); `src/LifeSim.Core/Actions/ActionResolver.cs`:76; plan.md:194, 186 | M1-01, M1-02 | none (correctness seam / cleanup) | developer (ruling: architect) | **Decided (wire in, not delete) — awaiting implementation (ADR-011, 2026-09-21).** `GameClockEventDispatcher` becomes the single owner of the clock advance — it raises `HourPassed` once per boundary and `DayStarted` at most once per advance. `WorldState` owns a private dispatcher and subscribes `HourPassed → Player.Stats.ApplyHourPassed` once at construction; `ActionResolver.Apply` no longer loops `ApplyHourPassed`. See [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21). |
+| **D12** | Medium | `GameClockEventDispatcher` has **zero call sites** — decay is invoked directly, so the plan's "decay applied on `HourPassed`" seam is a dead object. | `src/LifeSim.Core/Time/GameClockEventDispatcher.cs` (no references in `src/`); `src/LifeSim.Core/Actions/ActionResolver.cs`:76; plan.md:194, 186 | M1-01, M1-02 | none (correctness seam / cleanup) | developer (ruling: architect) | **Verified closed** — independent verification (debugger, 2026-09-21) supersedes the developer self-report; ruled "wire in, not delete" by `ADR-011`. Grep confirms **one** seam, **one** subscription, **one** call site: `WorldState` owns a private `GameClockEventDispatcher` and subscribes `HourPassed → Player.Stats.ApplyHourPassed` exactly once in the constructor; `ActionResolver.Apply` no longer loops `ApplyHourPassed`; `GameClockEventDispatcher.Advance` is the single advance owner (raises `HourPassed` once per boundary, `DayStarted` at most once per advance). **No double decay:** the direct `ApplyHourPassed` loop is gone, so decay fires only through the dispatch. General gate: `dotnet build LifeSim.sln --no-incremental` 0 Warning(s)/0 Error(s); `dotnet test LifeSim.sln` → 247/247. **Residual (public-API DoD trade-off) recorded under [§6 Batch 1](#batch-1--simulation-correctness-clockdecay-seam).** See [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21). |
 | **V1** | Verify-only | M1-04 atomicity AC is **unproven**: no mid-apply-error test; costs, clock and journal sit outside any transaction; the XML doc claims a successful resolve "is atomic". | plan.md:235; `src/LifeSim.Core/Actions/ActionResolver.cs`:8–12, 73–83, 221–309; `tests/LifeSim.Core.Tests/ActionResolverTests.cs`:283–310 (only failed-precondition + invalid-reference) | M1-04 | M1 exit gate (AC unproven) | testsmith | Open |
 | **V2** | Verify-only | Transition/recovery AC **partly met**: only 2 transitions and 3 of 5 stage-exception paths are tested; the resolver-throw (`Applying`) and `WorldTick` catches have zero tests; there is no `Recovery` state. | plan.md:254; `tests/LifeSim.Core.Tests/GameLoopTests.cs`:24–90; `src/LifeSim.Core/Turns/TurnState.cs`:7–17 | M1-05 | M1 exit gate (AC unproven) | testsmith | Open — **Batch 0 residuals now tracked here** (independent verification, 2026-09-21): (1) D2's refused-transition matrix is only partly covered — only `Idle→InputReceived` is forced, later `TryEnter` sites unexercised; (2) 2 of the 9 new GameLoop tests are **non-discriminating** — `RunTurn_JournalsStageTransitionsInExecutionOrder` and `Resolve_SuccessfulAction_DoesNotAppendActionFailedEntry` pass against pre-fix code, so they are guards, not fix evidence; (3) the `StageTransition.Seq < StageFailed.Seq` assertions in the Validating/Applying tests are meaningful but **not airtight** (pre-fix they fail for a different reason — no `StageFailed` entry existed); (4) small follow-up (**owner: testsmith**): rename `RunTurn_RecoversTranslatorFailure_UsesFallback`, which now asserts the opposite of its name. |
 | **V3** | Verify-only | "Clock cannot be mutated outside the resolver" has **no test**. `ArchitectureTests` is two assembly-level checks only; `WorldState.AdvanceClock` is `internal` and **no `InternalsVisibleTo` exists in `src/`**. | plan.md:181; `tests/LifeSim.Core.Tests/ArchitectureTests.cs`:9–51; `src/LifeSim.Core/Entities/WorldState.cs`:80 | M1-01 | M1 exit gate (AC unproven) | testsmith | Open |
@@ -91,11 +91,18 @@ Notes on the table:
   therefore describe a pipeline that did not execute.
 - **D8 is a "Decide", not a defect with a pre-agreed fix.** It is recorded here because it is a
   structural/determinism question; see [§5(a)](#5-open-decisions).
-- **D5 and D9 also need decisions.** D5 changes test semantics; D9 decides enforce-now vs defer.
+- **D9 still needs a decision** (enforce-now vs defer). D5's decision was ruled by `ADR-011`
+  (see [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21)),
+  and D5 is now independently verified and closed.
 - **Batch 0 (D1–D4) is now independently verified** (debugger, 2026-09-21) and closed. The
   residuals that keep evidence honest are in the **V2** row above and in
   [§5(f)](#f-translator-failure-recovery-model--resolved-2026-09-21-not-open); none of them weakens
   the D1/D3/D4 conclusion, and D2's stated deviation is deliberate. V2 remains **Open**.
+- **Batch 1 (D5, D12) is now independently verified** (debugger, 2026-09-21) and closed. **D6 is
+  the batch's open remainder** (`Decided — awaiting implementation (ADR-012)`). The residuals that
+  keep D5/D12 evidence honest — the `DemoWorld` balance signal (owner `worldsmith` / M1-07, tracked
+  under D10), the transient-hunger comment imprecision, and the `ADR-011` public-API DoD trade-off —
+  are recorded under [§6 Batch 1](#batch-1--simulation-correctness-clockdecay-seam).
 
 ---
 
@@ -179,8 +186,11 @@ the option set below, not by drifting into an implementation.
 
 - **Status: RESOLVED — binding ruling recorded as `ADR-011`** (appended after ADR-010 in
   `plan.md`'s ADR section). Decay is **boundary-based**, and `GameClockEventDispatcher` is **wired
-  in** (not deleted) as the single owner of hour/day events. This section is the ruling; the fix is
-  owed by **Batch 1** and must not be considered done until its closure proof passes.
+  in** (not deleted) as the single owner of hour/day events. The fix has since landed and **D5 and
+  D12 are verified closed** (independent `debugger` verification, 2026-09-21) — evidence and
+  residuals in [§6 Batch 1](#batch-1--simulation-correctness-clockdecay-seam). This section is the
+  ruling; the D6 remainder of Batch 1 is still owed under `ADR-012` and must not be considered done
+  until its closure proof passes.
 - **Original forces (kept for provenance).** `GameClock.Advance` returned `minutes / 60` chunks
   (`GameClock.cs`:93) while day detection was boundary-based (`GameClock.cs`:94); two 30-minute
   actions gave zero decay for a full hour while one 60-minute action gave one tick; `hoursPassed = 0`
@@ -369,6 +379,116 @@ Closing the underlying items remains governed by [§7](#7-per-item-closure-crite
   `Recovery` state — is **still required** under V2. This entry resolves the translator's *behaviour*;
   it does not substitute for that ADR. V2 remains **Open**.
 
+### (g) D6 — pass-out representation & application — RESOLVED (2026-09-21)
+
+- **Status: RESOLVED — binding ruling recorded as `ADR-012`** (appended after ADR-011 in
+  `plan.md`'s ADR section). This section is the ruling; the fix is owed by **Batch 1 (remainder)**
+  and must not be considered done until its closure proof passes. It does **not** claim D6 is fixed.
+- **Representation — `WorldRules`, not `StatDef`.** A BCL-only immutable record `WorldRules`
+  (`LifeSim.Core.Rules`) carries the pass-out parameters: `ForcedSleepHours` (int, default **6**,
+  must be ≥ 0), `PassOutMoodPenalty` (decimal, default **−10**, must be ≤ 0) and
+  `PassOutMoodStatId` (string, default `"mood"`), plus a `Default` singleton. `WorldState` accepts an
+  optional `WorldRules` (defaults to `WorldRules.Default`) and stores it privately. `StatDef` and
+  `StatConsequence` are **unchanged** — `StatDef` keeps the consequence *selector*, `WorldRules`
+  carries the *parameters* (as starvation already keeps `starvationDrainPerHour`/`starvationDrainTarget`
+  off `StatDef`, on the `StatSet` constructor).
+  **Why not `StatDef`:** the DoD forbids new engine API before a markdown-level test can drive it
+  (`plan.md`:1408), and a per-stat payload is heterogeneous (the fields only mean anything for
+  `PassOut`). **Why not `StatSet`:** it owns no clock, so it cannot express "N hours". **Why not
+  defer:** M1-02's AC (`plan.md`:212) and the M1 exit gate require enforcement now.
+- **Trigger semantics.** `WorldState` subscribes to the player's `StatSet.StatCritical`. A downward
+  crossing with `Consequence == PassOut` **only latches a pending pass-out** (the stat id); the
+  handler mutates nothing. This can be reached either from an action's energy cost (applied before
+  the advance) or from hourly decay (inside the advance); both drain through the same mechanism.
+- **Application semantics.** `ActionResolver.Apply` drains the pending pass-out **after** its own
+  `AdvanceClock` and after the `ActionResolved`/`DayStarted` entries, via an internal `WorldState`
+  method:
+  1. advance the clock by exactly `ForcedSleepHours` hours through the **same dispatcher** — a
+     multiple of 60 minutes always crosses exactly N boundaries, so exactly N `HourPassed` decay
+     ticks fire (no hand-rolled decay loop);
+  2. apply `PassOutMoodPenalty` to `PassOutMoodStatId` **exactly once** (clamped by that stat's
+     bounds; skipped if the stat is absent — the M2 validator owns the content warning);
+  3. journal the consequence (below).
+  The triggering action's effects and costs are **not** rolled back or interrupted; pass-out adds
+  time and a penalty, it does not cancel the action, and it does **not** restore energy. Forced
+  sleep crossing midnight/day boundaries rolls `DayIndex` and journals `DayStarted` normally.
+- **Once-per-crossing / re-arm.** The existing `Stat.IsCriticalArmed` semantics already make the
+  crossing fire once and re-arm only after the value recovers above `CriticalAt`; the ruling adds
+  only a re-entrancy guard: the pending latch is cleared **before** the forced-sleep advance, the
+  sleep calls the dispatcher directly (never a nested `AdvanceClock`), and any crossing raised
+  during the forced sleep is deferred to the next advance. Energy stuck at 0 never re-fires; after
+  an action restores energy above 0 and it crosses down again, pass-out fires again.
+- **Interaction with D5 / ADR-011 (no double decay).** The forced-sleep advance goes through the
+  same `WorldState.AdvanceClock`/dispatcher path as the action advance; `ApplyHourPassed` is never
+  called directly in the pass-out path. The two advances are separate dispatcher calls with
+  telescoping boundary counts, so total decay equals the sum of the hourly ticks — the constraint
+  recorded in §5(b) ("apply forced sleep **after** the advance completes, never from inside an
+  `HourPassed` handler") is satisfied by the pending-latch design.
+- **Determinism & replay.** Forced sleep is a pure function of `(clock, WorldRules)` — no RNG, no
+  wall clock, no `Guid`. The journal records exactly one new
+  `JournalEntryTypes.PassOut` entry per pass-out: `IsPinned = false`, `CorrelationId =
+  TurnCorrelation.Current ?? string.Empty` (its determinism is governed by D8), `SimTime` = the
+  clock at which the entity passed out, payload `"<statId>:<sleptHours>"` (e.g. `"energy:6"`).
+  Replay order per triggering action: `ActionResolved` → (`DayStarted`) → `PassOut` →
+  (`DayStarted` if the sleep rolled a day). Because D7 is still open, the payload stays a string
+  now; when D7 lands typed records this becomes a `PassOutPayload(string StatId, int SleptHours)`.
+  The journal entry is for observability/AI-context/debugging — action-driven replay
+  (`Replay_ReapplyingJournal_ReproducesStateHash`) reproduces the same state hash whether or not the
+  entry is replayed, because the consequence is re-derived from the re-applied action.
+- **DoD tension, recorded plainly.** `WorldRules` is a new **public** Core type added before any
+  markdown-level test exists, so it is a scoped exception to
+  [`AGENTS.md` §7](../../AGENTS.md) / `plan.md`:1408. It is kept to one record and three fields, it
+  is the exact materialization target M2-06 already scopes (`plan.md`:429), and **M2-06 owes the
+  markdown-level test that populates it from `rules/` content**. Extending `StatDef` would be a
+  strictly larger and less content-aligned violation. This is the smallest surface that satisfies
+  M1-02; it is recorded as debt, not waved through.
+- **Scope.** Player only in M1 — NPCs are not turn-simulated yet.
+- **Batch-1-remainder acceptance criteria (verbatim hand-off).**
+
+  **Representation**
+  1. `WorldRules` exists in `LifeSim.Core` (BCL-only; namespace `LifeSim.Core.Rules`) with
+     `ForcedSleepHours` (int, default 6, validated ≥ 0), `PassOutMoodPenalty` (decimal, default −10,
+     validated ≤ 0), `PassOutMoodStatId` (string, default `"mood"`) and `Default`. `StatDef` and
+     `StatConsequence` are unchanged; no new fields on either.
+  2. `WorldState` takes an optional `WorldRules` (defaulting to `WorldRules.Default`) and stores it
+     privately — no new public member on `WorldState` beyond the optional constructor parameter.
+
+  **Trigger**
+  3. The `StatCritical` handler only latches pending. A test crosses energy with `PassOut` and
+     asserts `world.Clock` and every stat value are unchanged until the drain.
+  4. Pass-out triggers from either the action's energy cost or hourly decay and drains identically.
+
+  **Application**
+  5. Draining advances by `ForcedSleepHours` hours via the dispatcher; a test proves exactly N
+     `HourPassed`/decay ticks fire and no manual `ApplyHourPassed` loop exists.
+  6. The mood penalty is applied exactly once, clamped, to `PassOutMoodStatId`; absent target stat is
+     a no-op (asserted).
+  7. The triggering action's effects/costs are not rolled back; the consequence does not restore
+     energy (asserted).
+
+  **Re-entrancy / once-per-crossing**
+  8. No recursion and no double-apply: a crossing raised during the forced-sleep advance is deferred;
+     the clock advances by exactly N.
+  9. `StatSetTests.PassOut_Consequence_IsReportedOnCrossing` (reporting) is unchanged; a new
+     enforcement test proves pass-out fires **once**, does not re-fire while energy stays 0, and
+     fires again after energy recovers above `CriticalAt` and crosses down again.
+
+  **Journal & determinism**
+  10. Exactly one `JournalEntryTypes.PassOut` entry per pass-out with `SimTime` = pass-out clock and
+      payload `"<statId>:<sleptHours>"`; a `DayStarted` entry when the sleep rolled a day; order
+      `ActionResolved` → (`DayStarted`) → `PassOut` → (`DayStarted`).
+  11. Two identical runs yield identical `StateHasher.Compute(world)`; the pass-out path contains no
+      RNG/wall-clock/`Guid`; `Replay_ReapplyingJournal_ReproducesStateHash` still passes with a
+      playthrough that triggers pass-out.
+
+  **D5/ADR-011 interaction**
+  12. A test proves total decay over an action plus its pass-out equals the sum of boundary ticks
+      (no double count) and that `ApplyHourPassed` is not called directly in the pass-out path.
+
+  **Gate**
+  13. Pass-out is engine-only (no AI); offline suites stay green. `dotnet build LifeSim.sln
+      -warnaserror` → 0 warnings/0 errors; `dotnet test LifeSim.sln` → all suites green.
+
 ---
 
 ## 6. Recommended execution order
@@ -418,7 +538,8 @@ for the narrowed "recovery/no-op" reading.
   `RunTurn_RefusedTransition_ReturnsTypedFailureAndStopsPipeline` (D2).
 
 **Effect on the M1 exit gate:** Batch 0's contribution is satisfied, but the gate **stays "not
-passed"** — D5–D12 and V1–V4 remain open.
+passed"** — **D5/D12 have since closed** (Batch 1, independent verification 2026-09-21), and
+**D6–D11 and V1–V4 remain open**.
 
 ### Batch 1 — simulation correctness (clock/decay seam)
 
@@ -427,9 +548,60 @@ passed"** — D5–D12 and V1–V4 remain open.
 and `ADR-011`: decay is **boundary-based** (`BoundariesCrossed` per HH:00 boundary) and
 `GameClockEventDispatcher` is **wired in** as the single owner of the advance; `WorldState`
 subscribes `HourPassed → Player.Stats.ApplyHourPassed`. Implement against the §5(b) acceptance
-criteria, enforce the pass-out consequence (D6 — apply forced sleep **after** the advance, never
-from inside an `HourPassed` handler), and do not treat D5/D12 as fixed until their closure proofs
-pass.
+criteria, enforce the pass-out consequence (D6 — parameters in `WorldRules`, apply forced sleep
+**after** the advance completes, never from inside an `HourPassed` handler; ruled by `ADR-012`,
+see [§5(g)](#g-d6--pass-out-representation--application--resolved-2026-09-21)), and do not treat
+D5/D12 as fixed until their closure proofs pass.
+
+**Status: D5 + D12 DONE — independently verified by `debugger` on 2026-09-21** (supersedes the
+developer self-report). Both are **Verified closed**. **D6 remains `Decided — awaiting
+implementation (ADR-012)` — this slice does not close it** (no `WorldRules`/`PassOut`
+implementation exists yet). The batch therefore closes its two clock/decay-seam items and leaves
+the pass-out remainder open.
+
+**Evidence (verbatim, `debugger` 2026-09-21) — supersedes the author's self-report:**
+- `dotnet --version` → `10.0.401`.
+- `dotnet build LifeSim.sln` and `dotnet build LifeSim.sln --no-incremental` → **0 Warning(s),
+  0 Error(s)**.
+- `dotnet test LifeSim.sln` → **247 passed / 0 failed / 0 skipped**; Core **167**, AI 33,
+  Console 45, World 1, Persistence 1. Offline confirmed (stub handlers / `FakeChatClient`);
+  no `Skip=`. Core went 150→167 = **+17 cases; no test removed** (230→247).
+- Boundary arithmetic independently reproduced: `13:30+90 → BoundariesCrossed 2`, `23:59+1 → 1`,
+  `14:30+60 → 1`, `14:30+30 → 1`, `14:30+29 → 0`; `week=168`, `multi-day=49`, `23:00+120=2`
+  unchanged.
+- **Partition independence proven and a genuine discriminator:** the 30+30 partition equals a
+  single 60-min action in both `BoundariesCrossed` **and** total decay (energy 99 both ways);
+  under the old `minutes/60` rule the partition gave 0 ticks, so the new tests **fail pre-fix**.
+- **No double decay:** `ActionResolver.Apply` no longer loops `ApplyHourPassed`; `WorldState` owns
+  a private dispatcher and subscribes `HourPassed → Player.Stats.ApplyHourPassed` exactly once in
+  the constructor; grep shows one seam, one subscription, one call site.
+- The changed integration assertion was audited: `DemoWorldPlaythroughTests` `health 100→85` is a
+  legitimate deterministic consequence of correct decay (20 boundaries/iteration vs 19; hunger
+  transiently hits 0 for 3 ticks; pre-existing `Starve` drain 3×5=15) — **not** a masked regression
+  and **not** double decay.
+- Scope: `src`/`tests` changed only in `Time/GameClock.cs`, `Time/GameClockEventDispatcher.cs`,
+  `Entities/WorldState.cs`, `Actions/ActionResolver.cs` plus `GameClockTests.cs`,
+  `GameClockEventDispatcherTests.cs`, `ActionResolverTests.cs`, `DemoWorldPlaythroughTests.cs`.
+  No `WorldRules`/`PassOut` implementation exists (D6 unimplemented). No test removed;
+  230→247 = +17 cases.
+
+**Residuals recorded honestly (none of them re-opens D5/D12):**
+1. **Balance signal (not a test defect) — owner `worldsmith` / [M1-07](../plan.md), tracked under
+   D10.** The demo world's 7-day script now transiently starves (hunger touches 0 for 3 hourly
+   ticks; ends health 85, hunger 24). An 8-day run would drive health toward 0. `DemoWorld` numbers
+   were tuned against the buggy decay. **Do not action here beyond recording** — D10 already tracks
+   the `DemoWorld` drift.
+2. **Comment imprecision (cosmetic).** The inline rule-9 reason says the loop "drives hunger to 0";
+   it is *transient* (final hunger 24). Note only; no behaviour implication.
+3. **Public-API DoD trade-off (acknowledged, ruling-level).** `GameClock.Advance`'s tuple element
+   was renamed (`HoursPassed` → `BoundariesCrossed`) and `GameClockEventDispatcher.Advance` now
+   returns a tuple — both are rulings of `ADR-011`, and **no markdown-level test exists yet** that
+   drives them from content. This is the same acknowledged class of trade-off recorded for D6 in
+   [§5(g)](#g-d6--pass-out-representation--application--resolved-2026-09-21); recorded as debt, not
+   waved through. The next content-driven engine API test is owed by M2.
+
+**Effect on the M1 exit gate:** D5 and D12's contribution is satisfied, but the gate **stays "not
+passed"** — **D6 remains open**, and D7–D11 and V1–V4 remain open.
 
 **Depends on:** none, but touches the same tests as Batch 0's timeline work — avoid running them
 concurrently in separate branches.
@@ -475,14 +647,14 @@ extend.
 | **D2** | A test drives each refused/illegal transition and asserts the loop returns a typed failure (`TurnError`) instead of continuing, and that **no** `ActionResolved` entry is journaled for a refused turn. | same as D1 |
 | **D3** | Tests prove: a failed stage is **not** journaled as entered; an escaping exception records a `TurnError` with the **real** stage (not hardcoded `Applying`); a failed `Resolve` appends a journal entry; raw input and the translated command are journaled. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~GameLoop"` then `dotnet test LifeSim.sln` |
 | **D4** | A test *`RunTurn_TranslatorFailure_DoesNotExecuteRawInputAsAction`*: with a throwing translator, raw text is not resolved as an action; the turn routes to a deterministic recovery/no-op. The existing `RunTurn_RecoversTranslatorFailure_UsesFallback` (`GameLoopTests.cs`:55–64) is updated, with the reason stated (AGENTS rule 9). | same as D1 |
-| **D5** | A test asserts two consecutive 30-minute actions across an hour boundary produce the **same** decay as one 60-minute action, and that `BoundariesCrossed` from `Advance` is partition-independent. `GameClockTests.cs`:119–127 and `GameClockEventDispatcherTests` are updated with the stated reason. Ruled boundary-based by `ADR-011`; see [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21) for the full acceptance criteria. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~GameClock"` then `dotnet test LifeSim.sln` |
-| **D6** | A test asserts energy reaching 0 with `PassOut` advances the clock by the forced-sleep hours and applies a mood penalty, **exactly once**, re-arming after recovery. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~StatSet"` then `dotnet test LifeSim.sln` |
+| **D5** | **Met — independently verified (debugger, 2026-09-21).** A test asserts two consecutive 30-minute actions across an hour boundary produce the **same** decay as one 60-minute action, and that `BoundariesCrossed` from `Advance` is partition-independent; both hold (30+30 == 60 in count and total decay, energy 99 both ways; old `minutes/60` rule gave 0, so the test fails pre-fix). `GameClockTests.cs`:119–127 and `GameClockEventDispatcherTests` were updated with the stated reason; `13:30+90 → 2`, `23:59+1 → 1`, `14:30+30 → 1`, `14:30+29 → 0`, `week=168`, `multi-day=49`, `23:00+120=2` all reproduce; `dotnet build LifeSim.sln --no-incremental` 0/0; `dotnet test LifeSim.sln` 247/247. Ruled boundary-based by `ADR-011`; see [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21) for the full acceptance criteria and [§6 Batch 1](#batch-1--simulation-correctness-clockdecay-seam) for the recorded residuals. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~GameClock"` then `dotnet test LifeSim.sln` |
+| **D6** | Pass-out is enforced: a `StatCritical` crossing with `PassOut` only **latches pending** (no mutation in the handler); after the action's advance completes, the clock advances by the `WorldRules` forced-sleep hours through the dispatcher, the mood penalty is applied **exactly once**, and it re-arms after recovery. The journal contains a single `PassOut` entry (`"<statId>:<sleptHours>"`). Ruled by `ADR-012`; see [§5(g)](#g-d6--pass-out-representation--application--resolved-2026-09-21) for the full acceptance criteria. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~PassOut"` then `dotnet test LifeSim.sln` |
 | **D7** | A test replays a scripted session containing a parameterised `Move` (with `targetId`) **from the journal alone** and reproduces `StateHasher.Compute(original)`. The journal type carries typed payloads (not `string?`); failed turns and raw input are present and replay/idempotent. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~Replay"` then `dotnet test LifeSim.sln` |
 | **D8** | A ruling is recorded (ADR appended after `plan.md`:1376 if it is an exception). If fixed: a test asserts two identical seeded turns produce identical correlation ids and a byte-stable journal. | ADR recorded in `plan.md`'s ADR section **and** `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~TurnCorrelation"` |
 | **D9** | A test asserts `Move` to a target absent from the current location's `Connections` is refused with a readable reason, and a `RequiresFlag` edge is refused until the flag is set. Deferred `AllowedActionIds`/open-hours is explicitly noted. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~ActionResolver"` then `dotnet test LifeSim.sln` |
 | **D10** | `tests/LifeSim.Core.Tests/DemoWorld.cs` matches `plan.md`:287 — exactly 3 locations, 3 NPCs, 6 actions **including `talk`**, 1 goal; every café `AllowedActionIds` entry resolves; the playthrough test asserts a `Relationship` change/milestone actually occurs. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~DemoWorld"` then `dotnet test LifeSim.sln` |
 | **D11** | A test asserts that with debt disabled an action whose `MoneyCost` would drive money negative is refused with a readable reason and mutates nothing; with debt enabled by world rules it succeeds to negative. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~ActionResolver"` then `dotnet test LifeSim.sln` |
-| **D12** | **(a) chosen by `ADR-011`** — `GameClockEventDispatcher` is wired into the clock advance (it owns the advance, raises `HourPassed` per boundary), `WorldState` subscribes `HourPassed → Player.Stats.ApplyHourPassed`, and a test proves `HourPassed` drives decay. Option (b) (delete) is rejected. See [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21). | `dotnet build LifeSim.sln -warnaserror` (proves no dangling reference) then `dotnet test LifeSim.sln` |
+| **D12** | **(a) chosen by `ADR-011` — Met, independently verified (debugger, 2026-09-21).** `GameClockEventDispatcher` is wired into the clock advance (it owns the advance, raises `HourPassed` per boundary), `WorldState` subscribes `HourPassed → Player.Stats.ApplyHourPassed` exactly once, and decay fires only through the dispatch (no direct `ApplyHourPassed` loop remains); grep shows one seam, one subscription, one call site. Option (b) (delete) is rejected. Build 0 Warning(s)/0 Error(s); `dotnet test LifeSim.sln` 247/247. See [§5(b)](#b-d5--d12--hour-decay-semantics-and-the-hourly-event-owner--resolved-2026-09-21) and [§6 Batch 1](#batch-1--simulation-correctness-clockdecay-seam) (public-API DoD trade-off residual). | `dotnet build LifeSim.sln -warnaserror` (proves no dangling reference) then `dotnet test LifeSim.sln` |
 | **V1** | A test injects a **mid-apply** failure and proves no partial application (staged apply or rollback), or the XML doc at `ActionResolver.cs`:8–12 is corrected to match the actual guarantee. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~Atomic"` then `dotnet test LifeSim.sln` |
 | **V2** | Tests cover the resolver-throw (`Applying`) and `WorldTick` exception paths, the full legal/illegal transition matrix, and **all five** stage-exception paths. Either add a `Recovery` state or record in an ADR that typed `TurnError` + `Idle` is the recovery model. | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~GameLoop"` then `dotnet test LifeSim.sln` |
 | **V3** | An architecture/encapsulation test proves `WorldState.Clock` cannot be mutated outside the resolver (e.g. reflection scan, or `InternalsVisibleTo` + an internal-only test). | `dotnet test tests/LifeSim.Core.Tests/LifeSim.Core.Tests.csproj --filter "FullyQualifiedName~Architecture"` then `dotnet test LifeSim.sln` |
