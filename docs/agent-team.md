@@ -4,7 +4,7 @@ Nine project-level [opencode](https://opencode.ai/docs/agents/) agents living in
 `.opencode/agents/`. They are committed to the repository, so every clone gets the same team.
 
 Shared project rules live in [`AGENTS.md`](../AGENTS.md) at the repo root — every agent inherits
-them. Deep domain knowledge lives in [`skills/`](../skills/) and is referenced by name from the
+them. Deep domain knowledge lives in [`.opencode/skills/`](../.opencode/skills/) and is referenced by name from the
 agent prompts rather than duplicated.
 
 ---
@@ -12,14 +12,17 @@ agent prompts rather than duplicated.
 ## Quick start
 
 ```
-opencode                      # starts in the primary agent
-@orchestrator implement M2-03 # route a task through the orchestrator
-@rubber-duck score this plan  # invoke a subagent directly
-@debugger the build is red    # go straight to the specialist
+opencode                      # starts in the orchestrator (configured default in opencode.json)
+@orchestrator implement M2-03 # route a task through the orchestrator explicitly
+@rubber-duck score this plan  # invoke a subagent directly (bypasses orchestrator)
+@debugger the build is red    # go straight to the specialist when you know which one
 ```
 
-Press **Tab** to cycle primary agents. Subagents are invoked with `@name`, or automatically by
-the orchestrator via the Task tool.
+`opencode.json` at the repo root pins `default_agent` to `orchestrator` so that a bare
+`opencode` opens the routing agent instead of the generic `build` agent. Bypass the
+orchestrator deliberately with `@name` when you already know which specialist you want —
+it's a default, not a cage. Press **Tab** to cycle primary agents; subagents are invoked
+with `@name` or automatically by the orchestrator via the Task tool.
 
 ---
 
@@ -121,7 +124,7 @@ to edit `src/` does not. Its prompt makes "a second world ships with zero engine
 test it must satisfy, and tells it to report an engine assumption rather than work around one.
 
 **Scribe exists because the DoD has a docs item that nobody owned.** It also inherits a real gap:
-`CHANGELOG.md` does not exist yet even though the DoD and `skills/adr-plan-workflow` require one.
+`CHANGELOG.md` does not exist yet even though the DoD and `.opencode/skills/adr-plan-workflow` require one.
 Its prompt tells it to create the file on first need and *not* to invent back-history.
 
 **Subagents have `task: deny`.** Only the orchestrator can spawn work. That keeps the chain

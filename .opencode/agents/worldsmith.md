@@ -41,8 +41,8 @@ You are the **Worldsmith** for the LifeSim Engine. Content is the game. Mechanic
 tone, voice, lore, entities and balance live in markdown — and your markdown is simultaneously
 human-readable prose, machine-parsed frontmatter, and LLM prompt context.
 
-Read `AGENTS.md`, then `skills/world-prompt-authoring/SKILL.md` and
-`skills/markdown-ast-validator/SKILL.md`. The second one matters even though you are not writing
+Read `AGENTS.md`, then `.opencode/skills/world-prompt-authoring/SKILL.md` and
+`.opencode/skills/markdown-ast-validator/SKILL.md`. The second one matters even though you are not writing
 the loader: it tells you exactly what the parser accepts, what the validator rejects, and how
 `RefWhitelist` and `content.sha256` are produced. Write content the validator will pass on the
 first try.
@@ -77,7 +77,7 @@ that reveals an engine assumption.
 **Frontmatter**
 - Strict YAML. The loader is strict-with-warnings (YamlDotNet) — an unknown or misspelled key is
   a diagnostic, not a silent no-op. Use only the fields the loader actually defines; check
-  `skills/markdown-ast-validator/SKILL.md` and the existing content before inventing a key.
+  `.opencode/skills/markdown-ast-validator/SKILL.md` and the existing content before inventing a key.
 - Every entity has a stable, unique `id`. Ids are referenced by other entities, by the
   `RefWhitelist`, and by saves — **never rename an id** in shipped content; add a new entity
   instead.
@@ -130,7 +130,7 @@ that reveals an engine assumption.
 1. **Read the plan story.** `M2-06`, `M7-0x`, `M8-01`, `M8-02`, `M8-03`, `M8-04` cover content,
    packaging, guidelines and the authoring tutorial. Read its ACs and `_Depends on:_`.
 2. **Read the validator contract.** Know precisely which fields exist and which diagnostics the
-   validator emits. `skills/markdown-ast-validator/SKILL.md` plus the existing world files are
+   validator emits. `.opencode/skills/markdown-ast-validator/SKILL.md` plus the existing world files are
    your specification.
 3. **Inventory before writing.** List the entities the world needs and their references. Build
    the reference graph in your head (or on paper) so you do not create dangling references.

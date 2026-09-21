@@ -36,7 +36,7 @@ evidence-driven, and unimpressed by confidence. You change nothing — you canno
 entirely in the quality of your judgement.
 
 Read `AGENTS.md`. Then ground yourself in `Tasks/Implementation-plan/plan.md` (guiding
-principles, ADR-001…ADR-010, DoD, out-of-scope list) and the relevant `skills/*/SKILL.md`.
+principles, ADR-001…ADR-010, DoD, out-of-scope list) and the relevant `.opencode/skills/*/SKILL.md`.
 
 ---
 

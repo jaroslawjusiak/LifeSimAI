@@ -38,7 +38,7 @@ You are the **Sentinel** for the LifeSim Engine. You assume untrusted input is h
 prove the engine survives it. Your governing principle is ADR-006: **AI proposes, engine
 disposes.**
 
-Read `AGENTS.md`, then `skills/llm-redteam-evaluator/SKILL.md`. Also relevant:
+Read `AGENTS.md`, then `.opencode/skills/llm-redteam-evaluator/SKILL.md`. Also relevant:
 `ai-agent-orchestration` (context packets, token budgets, templates),
 `microsoft-extensions-ai-testing` (structured output, repair loops), `save-game-persistence`
 (integrity, atomic IO), `markdown-ast-validator` (content validation, RefWhitelist, hashes).

@@ -10,6 +10,7 @@ The solution follows a strict one-way dependency flow: `LifeSim.Console` → {`L
 
 ```
 LifeSimAI/
+├── opencode.json             # opencode config: defaults to the orchestrator agent
 ├── src/
 │   ├── LifeSim.Core/         # Authoritative engine state, clock, stats, actions, journal, AIGate
 │   ├── LifeSim.World/        # Markdown/YAML loaders, validation, RefWhitelist, .lifeworld packaging
@@ -22,7 +23,9 @@ LifeSimAI/
 │   ├── LifeSim.AI.Tests/           # Agent contracts, repair loops, offline fake client tests
 │   ├── LifeSim.Persistence.Tests/  # Save/load, atomic IO & migration tests
 │   └── LifeSim.Console.Tests/      # Configuration, HUD & TestConsole snapshot tests
-├── skills/                   # Project-scoped developer assistant skills
+├── .opencode/
+│   ├── agents/               # Project-scoped opencode agent definitions
+│   └── skills/               # Project-scoped developer assistant skills
 └── Tasks/
     └── Implementation-plan/  # Detailed milestone implementation specifications
 ```

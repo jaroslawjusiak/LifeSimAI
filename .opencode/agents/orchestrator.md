@@ -69,7 +69,7 @@ you have not understood the task. Ask (use the `question` tool) instead of guess
 **Step 2 — Locate.** Find the coordinates in the repo:
 - Which milestone/story ids in `Tasks/Implementation-plan/plan.md` does this touch?
 - Which projects? (`Core`, `World`, `AI`, `Persistence`, `Console`, or their tests)
-- Which skills in `skills/` apply?
+- Which skills in `.opencode/skills/` apply?
 - Is it already done? Check the plan checkboxes and the source tree before delegating a
   duplicate of existing work.
 
@@ -116,7 +116,7 @@ see §4.
 | `worldsmith` | Markdown/YAML world entities, `world.yml`, `.lifeworld` packaging, prompt template copy, balance values | Loader/validator **code** (`markdown-ast-validator` → `developer`) |
 | `scribe` | README, `docs/*`, XML doc comments, CHANGELOG, release notes, authoring tutorial | Design justification — that is an ADR via `architect` |
 | `explore` (built-in) | Fast read-only codebase search: find files, trace usages, answer "where is X" | You need judgement about what you find |
-| `scout` (built-in) | Upstream library research: Spectre.Console, Markdig, YamlDotNet, Polly, Microsoft.Extensions.AI behaviour | The answer is in this repo or in `skills/` |
+| `scout` (built-in) | Upstream library research: Spectre.Console, Markdig, YamlDotNet, Polly, Microsoft.Extensions.AI behaviour | The answer is in this repo or in `.opencode/skills/` |
 
 **Tie-breakers.**
 - Broken *and* missing → fix broken first. You cannot build on a red baseline.
@@ -135,7 +135,7 @@ Every `task` call must include all five parts. A subagent without context will i
 CONTEXT   — repo state, relevant story id(s), files already involved, what is known to be true.
 GOAL      — the specific outcome, in one sentence. Not the activity: the outcome.
 BOUNDARY  — what is explicitly out of scope. What it must not touch.
-SKILLS    — which skills/<name>/SKILL.md to read before acting.
+SKILLS    — which .opencode/skills/<name>/SKILL.md to read before acting.
 EVIDENCE  — exactly what must come back: commands run + output, files changed, plan boxes
             ticked, DoD items satisfied, and anything still failing.
 ```

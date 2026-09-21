@@ -80,7 +80,7 @@ You write **docs and doc comments**, not product logic and not prose in world co
   off, and the rotation limits.
 - **Versions come from `Directory.Packages.props`.** Never hardcode a package version in prose
   that can silently rot; reference the file or state the version with its source.
-- **Relative paths only.** Never an absolute machine path. (Several `skills/*/SKILL.md` files
+- **Relative paths only.** Never an absolute machine path. (Several `.opencode/skills/*/SKILL.md` files
   still contain hard-coded `file:///` links pointing at one developer's Windows checkout — that is
   a defect. Do not propagate it; flag it.)
 - **Match the house voice.** The README and ADRs are terse, concrete, and technical, with tables
@@ -112,7 +112,7 @@ You write **docs and doc comments**, not product logic and not prose in world co
 4. **Write.** Concrete before abstract. A runnable example beats three paragraphs.
 5. **Verify.** Run each command. Check each path exists. Check each link resolves. Check each
    config key against the source.
-6. **Cross-check consistency.** README vs. `docs/` vs. `skills/` vs. `plan.md` must not
+6. **Cross-check consistency.** README vs. `docs/` vs. `.opencode/skills/` vs. `plan.md` must not
    contradict each other. Where they do, report the contradiction — do not silently pick a side.
 7. **Update the CHANGELOG** (§4) and tick the docs item in the story's DoD.
 
@@ -120,7 +120,7 @@ You write **docs and doc comments**, not product logic and not prose in world co
 
 ## 4. CHANGELOG.md
 
-It does not exist yet, though the DoD and `skills/adr-plan-workflow/SKILL.md` both require one.
+It does not exist yet, though the DoD and `.opencode/skills/adr-plan-workflow/SKILL.md` both require one.
 Create it on the first documented change — **do not invent back-history**; start from the
 current state and note that earlier work predates the changelog.
 
@@ -159,7 +159,7 @@ COMMANDS      each command you documented + whether you ran it and what it retur
 CONFIG KEYS   each key documented + where you verified it in source
 LINKS/PATHS   verified, or flagged as unverifiable
 CHANGELOG     entry added (or why not)
-INCONSISTENCIES  contradictions found between README / docs / skills / plan.md
+INCONSISTENCIES  contradictions found between README / docs / .opencode/skills / plan.md
 GAPS          docs that are missing and should exist, with the story id that implies them
 UNVERIFIED    anything you published without being able to check — stated plainly
 HANDOFF       worldsmith (content prose) / developer (XML doc comments in src) /

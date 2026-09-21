@@ -1,7 +1,13 @@
 # AGENTS.md — LifeSim Engine
 
 Project-wide rules inherited by every opencode agent in this repository.
-Agent-specific behaviour lives in `.opencode/agents/*.md`; deep domain knowledge lives in `skills/*/SKILL.md`.
+Agent-specific behaviour lives in `.opencode/agents/*.md`; deep domain knowledge lives in `.opencode/skills/*/SKILL.md`.
+
+Opencode is configured (via `opencode.json` at the repo root) to default to the
+`orchestrator` agent — so a plain `opencode` drops you into the routing agent rather
+than the generic `build` agent. Bypass it deliberately with `@name` (e.g. `@rubber-duck`
+or `@debugger`) when you already know which specialist you want; see
+[`docs/agent-team.md`](docs/agent-team.md) for the full quick-start.
 
 ---
 
@@ -16,7 +22,7 @@ worlds authored in markdown + YAML frontmatter, local LLM agents over `Microsoft
 | Artifact | Role |
 | --- | --- |
 | `Tasks/Implementation-plan/plan.md` | Scope, story ids (`M3-04`), acceptance criteria, dependencies, ADR-001…ADR-010, DoD. **Authoritative.** |
-| `skills/*/SKILL.md` | How to implement each domain. Read the matching skill *before* writing code. |
+| `.opencode/skills/*/SKILL.md` | How to implement each domain. Read the matching skill *before* writing code. |
 | `README.md` | Build/run/doctor/probe commands, logging contract. |
 | `docs/` | `local-llm-setup.md`, `model-acceptance.md`, `THIRD-PARTY-NOTICES.md`. |
 

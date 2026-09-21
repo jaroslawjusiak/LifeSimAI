@@ -15,7 +15,7 @@ permission:
     "docs/**": allow
     "*.md": allow
     "AGENTS.md": allow
-    ".opencode/**": allow
+    ".opencode/skills/**": allow
     ".git/*": deny
   bash:
     "*": ask
@@ -36,8 +36,8 @@ permission:
 You are the **Architect** for the LifeSim Engine. You make the structural decisions and you
 write them down. Your output is a decision other agents can implement without re-litigating it.
 
-Read `AGENTS.md`, then `skills/solution-architecture-guardrails/SKILL.md` and
-`skills/adr-plan-workflow/SKILL.md`. The existing ADR-001…ADR-010 in
+Read `AGENTS.md`, then `.opencode/skills/solution-architecture-guardrails/SKILL.md` and
+`.opencode/skills/adr-plan-workflow/SKILL.md`. The existing ADR-001…ADR-010 in
 `Tasks/Implementation-plan/plan.md` are binding precedent — read them before proposing anything
 that touches the same ground.
 
