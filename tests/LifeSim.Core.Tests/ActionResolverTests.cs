@@ -31,14 +31,17 @@ public class ActionResolverTests
 
     private static Location Loc(string id, string? type = null) => new(id, id, [], type: type);
 
-    private static WorldState BuildWorld(params ActionDefinition[] actions) => new(
+    private static WorldState BuildWorld(params ActionDefinition[] actions) =>
+        BuildWorld(new GameClock(0, 9, 0), actions);
+
+    private static WorldState BuildWorld(GameClock clock, params ActionDefinition[] actions) => new(
         new Player("Alex", Stats(), Skills(), 100m, "flat"),
         [Mia()],
         [Loc("flat", "home"), Loc("office", "workplace"), Loc("cafe")],
         [new Item("coffee", "Coffee")],
         [new SkillDef("coding", "Coding", [100], [])],
         actions,
-        new GameClock(0, 9, 0));
+        clock);
 
     private static ActionDefinition Act(
         string id,
@@ -357,5 +360,44 @@ public class ActionResolverTests
 
         world.Clock.Hour.Should().Be(11);
         world.Player.Stats.ValueOf("energy").Should().Be(98m); // 100 - 2 hours decay
+    }
+
+    [Theory]
+    [InlineData(0, 0)]    // 14:30 -> 14:30, no boundary crossed
+    [InlineData(29, 0)]   // 14:30 -> 14:59, no boundary crossed
+    [InlineData(30, 1)]   // 14:30 -> 15:00, one boundary crossed (old chunk rule: zero)
+    [InlineData(60, 1)]   // 14:30 -> 15:30, one boundary crossed
+    [InlineData(90, 2)]   // 14:30 -> 16:00, two boundaries crossed (old chunk rule: one)
+    [InlineData(120, 2)]  // 14:30 -> 16:30, two boundaries crossed
+    public void Resolve_DecaysOncePerHourBoundaryCrossed(int timeCostMinutes, int expectedTicks)
+    {
+        // D12/ADR-011 closure proof: WorldState subscribes ApplyHourPassed to the dispatcher's
+        // HourPassed once at construction, and the dispatcher raises HourPassed once per HH:00
+        // boundary crossed. 'energy' decays 1 per tick, so this also proves the subscription is
+        // wired exactly once (a duplicate would over-decay). The 14:30 start is deliberate: it is
+        // off the hour, so the boundary rule disagrees with the old `minutes / 60` chunk rule.
+        var world = BuildWorld(new GameClock(0, 14, 30), Act("wait", timeCost: timeCostMinutes));
+
+        ActionResolver.Resolve(world, "wait");
+
+        world.Player.Stats.ValueOf("energy").Should().Be(100m - expectedTicks);
+    }
+
+    [Fact]
+    public void Resolve_ThirtyMinutePartition_DecaysSameAsSingleSixtyMinuteAction()
+    {
+        // D5 closure proof: two 30-minute actions (14:30 -> 15:00 -> 15:30) must decay exactly the
+        // same total as one 60-minute action (14:30 -> 15:30). Under the old `minutes / 60` rule the
+        // partition decayed zero times while the single action decayed once.
+        var single = BuildWorld(new GameClock(0, 14, 30), Act("long", timeCost: 60));
+        ActionResolver.Resolve(single, "long");
+
+        var partitioned = BuildWorld(new GameClock(0, 14, 30), Act("short", timeCost: 30));
+        ActionResolver.Resolve(partitioned, "short");
+        ActionResolver.Resolve(partitioned, "short");
+
+        partitioned.Clock.Should().Be(single.Clock);
+        partitioned.Player.Stats.ValueOf("energy").Should().Be(99m);
+        partitioned.Player.Stats.ValueOf("energy").Should().Be(single.Player.Stats.ValueOf("energy"));
     }
 }

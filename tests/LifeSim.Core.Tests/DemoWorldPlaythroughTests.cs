@@ -34,7 +34,12 @@ public class DemoWorldPlaythroughTests
         world.Clock.DayIndex.Should().BeGreaterThanOrEqualTo(7);
         world.Player.Stats.ValueOf("energy").Should().BeGreaterThan(0);
         world.Player.Stats.ValueOf("hunger").Should().BeGreaterThan(0);
-        world.Player.Stats.ValueOf("health").Should().Be(100m);
+        // Changed 100 -> 85 (AGENTS rule 9): ADR-011 makes decay boundary-based, so this scripted
+        // loop now crosses more hour boundaries than the old `minutes / 60` chunk count did. The
+        // extra decay drives hunger to 0, and the pre-existing Starve consequence (untouched by
+        // this story) drains health by 5/hour. 85 is the deterministic outcome under the ruled
+        // semantics and remains > 0, so the "keeps stats alive" property this test guards holds.
+        world.Player.Stats.ValueOf("health").Should().Be(85m);
         world.Player.Money.Should().BeGreaterThan(100m);
     }
 

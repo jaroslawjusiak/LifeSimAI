@@ -119,11 +119,9 @@ public static class ActionResolver
             world.Player.Money -= action.MoneyCost;
         }
 
-        var (hoursPassed, dayStarted) = world.AdvanceClock(action.TimeCostMinutes);
-        for (var i = 0; i < hoursPassed; i++)
-        {
-            world.Player.Stats.ApplyHourPassed();
-        }
+        // Decay is no longer applied here: WorldState owns the clock seam and its dispatcher
+        // raises HourPassed once per hour boundary crossed, which decays the player (ADR-011).
+        var (_, dayStarted) = world.AdvanceClock(action.TimeCostMinutes);
 
         world.Journal.Append(
             TurnCorrelation.Current ?? string.Empty,

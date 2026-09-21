@@ -74,10 +74,17 @@ public readonly record struct GameClock
 
     /// <summary>
     /// Advances the clock forward by <paramref name="minutes"/>, rolling hour, day and week
-    /// boundaries as needed. Returns the new clock, the number of full hours elapsed
-    /// (<paramref name="minutes"/> / 60), and whether the day index increased.
+    /// boundaries as needed.
     /// </summary>
-    public (GameClock NewClock, int HoursPassed, bool DayStarted) Advance(int minutes)
+    /// <returns>
+    /// The new clock, the number of <em>hour boundaries</em> crossed, and whether the day index
+    /// increased. A boundary is a clock hour mark (HH:00), so the count is
+    /// <c>floor(newTotalMinutes / 60) − floor(TotalMinutes / 60)</c> — <em>not</em> the elapsed
+    /// <c>minutes / 60</c> chunks. It telescopes over any partition of an interval: two
+    /// consecutive advances cross exactly as many boundaries as one advance covering both, so
+    /// the value is a pure, stateless function of <c>(start, minutes)</c> (ADR-011).
+    /// </returns>
+    public (GameClock NewClock, int BoundariesCrossed, bool DayStarted) Advance(int minutes)
     {
         if (minutes < 0)
         {
@@ -90,9 +97,9 @@ public readonly record struct GameClock
         var newHour = minuteOfDay / MinutesPerHour;
         var newMinute = minuteOfDay % MinutesPerHour;
 
-        var hoursPassed = minutes / MinutesPerHour;
+        var boundariesCrossed = (newTotalMinutes / MinutesPerHour) - (TotalMinutes / MinutesPerHour);
         var dayStarted = newDayIndex > DayIndex;
 
-        return (new GameClock(newDayIndex, newHour, newMinute), hoursPassed, dayStarted);
+        return (new GameClock(newDayIndex, newHour, newMinute), boundariesCrossed, dayStarted);
     }
 }

@@ -18,6 +18,7 @@ public sealed class WorldState
     private readonly Dictionary<string, Item> _items;
     private readonly Dictionary<string, SkillDef> _skills;
     private readonly Dictionary<string, ActionDefinition> _actions;
+    private readonly GameClockEventDispatcher _clockDispatcher = new();
 
     public WorldState(
         Player player,
@@ -40,6 +41,12 @@ public sealed class WorldState
         Flags = [];
         Unlocks = [];
         Journal = new EventJournal();
+
+        // Decay is driven by the clock seam (ADR-011): the dispatcher raises HourPassed once per
+        // hour boundary crossed and this single subscription applies one decay tick per boundary.
+        // Subscribed exactly once, at construction; the dispatcher is private so this is the only
+        // owner of the advance and no new public engine API is introduced.
+        _clockDispatcher.HourPassed += Player.Stats.ApplyHourPassed;
     }
 
     public Player Player { get; }
@@ -76,12 +83,16 @@ public sealed class WorldState
 
     public ActionDefinition? GetAction(string id) => _actions.TryGetValue(id, out var v) ? v : null;
 
-    /// <summary>Advances the clock forward and reports the hours passed and whether a day started.</summary>
-    internal (int HoursPassed, bool DayStarted) AdvanceClock(int minutes)
+    /// <summary>
+    /// Advances the clock forward through the private <see cref="GameClockEventDispatcher"/>, which
+    /// is the single owner of the advance: it raises <c>HourPassed</c> once per hour boundary
+    /// crossed (driving player decay) and reports the boundaries crossed and whether a day started.
+    /// </summary>
+    internal (int BoundariesCrossed, bool DayStarted) AdvanceClock(int minutes)
     {
-        var (next, hoursPassed, dayStarted) = Clock.Advance(minutes);
+        var (next, boundariesCrossed, dayStarted) = _clockDispatcher.Advance(Clock, minutes);
         Clock = next;
-        return (hoursPassed, dayStarted);
+        return (boundariesCrossed, dayStarted);
     }
 
     /// <summary>

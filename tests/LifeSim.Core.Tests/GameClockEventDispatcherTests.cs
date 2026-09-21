@@ -23,14 +23,16 @@ public class GameClockEventDispatcherTests
     }
 
     [Fact]
-    public void Advance_NinetyMinutes_FiresHourPassedOnce()
+    public void Advance_NinetyMinutes_CrossingTwoBoundaries_FiresHourPassedTwice()
     {
         var hourPassed = 0;
         _dispatcher.HourPassed += () => hourPassed++;
 
         _dispatcher.Advance(new GameClock(0, 13, 30), 90);
 
-        hourPassed.Should().Be(1);
+        // Changed 1 -> 2 (AGENTS rule 9): ADR-011 raises HourPassed once per HH:00 boundary crossed,
+        // not once per elapsed `minutes / 60` chunk. 13:30 -> 15:00 crosses 14:00 and 15:00.
+        hourPassed.Should().Be(2, because: "13:30→15:00 crosses the 14:00 and 15:00 boundaries (ADR-011)");
     }
 
     [Fact]
@@ -45,7 +47,7 @@ public class GameClockEventDispatcherTests
     }
 
     [Fact]
-    public void Advance_OneMinuteAcrossMidnight_FiresDayStartedOnce_AndNoHourPassed()
+    public void Advance_OneMinuteAcrossMidnight_FiresHourPassedOnce_AndDayStartedOnce()
     {
         var hourPassed = 0;
         var dayStarted = 0;
@@ -54,7 +56,9 @@ public class GameClockEventDispatcherTests
 
         _dispatcher.Advance(new GameClock(0, 23, 59), 1);
 
-        hourPassed.Should().Be(0);
+        // Changed 0 -> 1 (AGENTS rule 9): ADR-011 ties HourPassed to HH:00 boundaries crossed, not
+        // elapsed `minutes / 60` chunks. 23:59 -> 00:00 crosses the midnight boundary.
+        hourPassed.Should().Be(1, because: "23:59→00:00 crosses the midnight boundary (ADR-011)");
         dayStarted.Should().Be(1);
     }
 
@@ -111,8 +115,12 @@ public class GameClockEventDispatcherTests
     [Fact]
     public void Advance_ReturnsTheAdvancedClock()
     {
-        var next = _dispatcher.Advance(new GameClock(0, 23, 59), 1);
+        // Updated for the ADR-011 return shape: the dispatcher returns the full advance result
+        // (new clock, boundaries crossed, day started), not just the clock.
+        var (next, boundariesCrossed, dayStarted) = _dispatcher.Advance(new GameClock(0, 23, 59), 1);
 
         next.Should().Be(new GameClock(1, 0, 0));
+        boundariesCrossed.Should().Be(1);
+        dayStarted.Should().BeTrue();
     }
 }
