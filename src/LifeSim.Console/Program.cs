@@ -1,4 +1,6 @@
+using System.Net.Http;
 using LifeSim.AI.Diagnostics;
+using LifeSim.Console.Commands;
 using LifeSim.Console.Configuration;
 using LifeSim.Console.Logging;
 using Serilog;
@@ -12,6 +14,20 @@ var (options, errors) = LifeSimConfigurationBuilder.BindAndValidate(configuratio
 if (ConfigurationValidationReporter.ReportAndCheck(errors))
 {
     return 1; // Exit with error code on invalid config
+}
+
+// ── Diagnostics command: doctor ─────────────────────────────────────────────
+if (string.Equals(commandLine.Command, "doctor", StringComparison.OrdinalIgnoreCase))
+{
+    using var handler = new HttpClientHandler();
+    return await DoctorCommand.RunAsync(options.Llm, handler);
+}
+
+// ── Diagnostics command: probe (model acceptance gate) ──────────────────────
+if (string.Equals(commandLine.Command, "probe", StringComparison.OrdinalIgnoreCase))
+{
+    using var handler = new HttpClientHandler();
+    return await ProbeCommand.RunAsync(options.Llm, handler);
 }
 
 // ── Logging ────────────────────────────────────────────────────────────────

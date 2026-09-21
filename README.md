@@ -51,6 +51,22 @@ dotnet run --project src/LifeSim.Console/LifeSim.Console.csproj
 ```
 Add `-- --verbose` to raise console/file log verbosity.
 
+### Checking the local LLM
+```bash
+dotnet run --project src/LifeSim.Console/LifeSim.Console.csproj -- doctor
+```
+The `doctor` command probes the configured `Llm:Endpoint` for reachability and confirms the
+configured `Llm:Model` is present in `/v1/models`. Exit code `0` = healthy. See
+[docs/local-llm-setup.md](docs/local-llm-setup.md) for the full Jan setup runbook.
+
+### Model acceptance gate (structured-output probe)
+```bash
+dotnet run --project src/LifeSim.Console/LifeSim.Console.csproj -- probe
+```
+Fires the four probe cases (plain JSON, self-repair, roleplay, injection-as-data) at the
+configured model, prints a latency/result table, archives the acceptance record to
+`docs/model-acceptance.md`, and exits non-zero when any JSON-contract case fails.
+
 ---
 
 ## Logging & LLM call journal

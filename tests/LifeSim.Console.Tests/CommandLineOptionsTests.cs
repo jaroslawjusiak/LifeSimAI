@@ -26,4 +26,39 @@ public class CommandLineOptionsTests
     {
         CommandLineOptions.Parse(["--probe", "value"]).Verbose.Should().BeFalse();
     }
+
+    [Fact]
+    public void Parse_DefaultsToNoCommand()
+    {
+        CommandLineOptions.Parse([]).Command.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("doctor")]
+    [InlineData("DOCTOR")]
+    public void Parse_RecognizesBareCommandVerb(string arg)
+    {
+        CommandLineOptions.Parse([arg]).Command.Should().Be(arg);
+    }
+
+    [Fact]
+    public void Parse_CombinesVerboseSwitchAndCommand()
+    {
+        var options = CommandLineOptions.Parse(["--verbose", "doctor"]);
+
+        options.Verbose.Should().BeTrue();
+        options.Command.Should().Be("doctor");
+    }
+
+    [Fact]
+    public void Parse_TreatsLeadingDashTokenAsNotACommand()
+    {
+        CommandLineOptions.Parse(["--doctor"]).Command.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_CapturesOnlyFirstCommandVerb()
+    {
+        CommandLineOptions.Parse(["doctor", "probe"]).Command.Should().Be("doctor");
+    }
 }

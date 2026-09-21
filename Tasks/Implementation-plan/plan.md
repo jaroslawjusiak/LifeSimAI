@@ -136,9 +136,9 @@ As a developer, I want a documented, repeatable Jan setup so any local machine c
 - curl smoke command + expected output included
 
 **Subtasks:**
-- [ ] [AI] Evaluate 2–3 candidate local models for JSON instruction-following
-- [ ] [AI] Write the runbook incl. screenshots, hardware matrix, troubleshooting
-- [ ] [CS] Add `doctor` command that checks endpoint reachability + model presence
+- [x] [AI] Evaluate 2–3 candidate local models for JSON instruction-following
+- [x] [AI] Write the runbook incl. screenshots, hardware matrix, troubleshooting
+- [x] [CS] Add `doctor` command that checks endpoint reachability + model presence
 
 
 #### M0-06 [AI] Prompt capability probe harness  · _Must · M_
@@ -153,9 +153,9 @@ As a developer, I want a tiny CLI command that fires canned prompts at the confi
 - Repair-case proves the model can fix its own invalid JSON given the error
 
 **Subtasks:**
-- [ ] [AI] Implement raw prompt sender honoring configured endpoint/model/timeout
-- [ ] [AI] Author the 4 probe cases incl. repair loop and injection-as-data case
-- [ ] [CS] Render probe results as Spectre table with timings + exit codes
+- [x] [AI] Implement raw prompt sender honoring configured endpoint/model/timeout
+- [x] [AI] Author the 4 probe cases incl. repair loop and injection-as-data case
+- [x] [CS] Render probe results as Spectre table with timings + exit codes
 
 _Depends on: M0-05_
 
@@ -182,9 +182,9 @@ As the engine, I need one authoritative time source (day of week, hour, day phas
 - DayStarted fires exactly once per day change regardless of advance size
 
 **Subtasks:**
-- [ ] [CS] GameClock value type + DayPhase enum + Advance API
-- [ ] [CS] Internal event dispatcher publishing HourPassed/DayStarted
-- [ ] [CS] Rollover/phase unit-test matrix (dozen+ cases)
+- [x] [CS] GameClock value type + DayPhase enum + Advance API
+- [x] [CS] Internal event dispatcher publishing HourPassed/DayStarted
+- [x] [CS] Rollover/phase unit-test matrix (dozen+ cases)
 
 
 #### M1-02 [CS] Stat set, decay & critical thresholds  · _Must · M_
@@ -199,9 +199,9 @@ As the engine, I need clamped stats (energy, hunger, mood, hygiene, health, stre
 - Pass-out and starvation consequences covered by unit tests
 
 **Subtasks:**
-- [ ] [CS] StatSet + StatDef model with decay application on HourPassed
-- [ ] [CS] Threshold detector with once-per-crossing semantics
-- [ ] [CS] Consequence hooks (pass-out, starvation) + tests
+- [x] [CS] StatSet + StatDef model with decay application on HourPassed
+- [x] [CS] Threshold detector with once-per-crossing semantics
+- [x] [CS] Consequence hooks (pass-out, starvation) + tests
 
 _Depends on: M1-01_
 
@@ -217,10 +217,10 @@ As the engine, I need the complete in-memory world state so actions and AI conte
 - Location graph supports one-way connections and gated edges (requires key/flag)
 
 **Subtasks:**
-- [ ] [CS] Player/Npc/Location/Item/Skill entity classes inside WorldState
-- [ ] [CS] Weekly schedule model + resolver + tests
-- [ ] [CS] Relationship tracker with milestone events
-- [ ] [CS] Skill XP/level model with prerequisite checks
+- [x] [CS] Player/Npc/Location/Item/Skill entity classes inside WorldState
+- [x] [CS] Weekly schedule model + resolver + tests
+- [x] [CS] Relationship tracker with milestone events
+- [x] [CS] Skill XP/level model with prerequisite checks
 
 _Depends on: M1-02_
 
@@ -237,10 +237,10 @@ As the engine, I need declarative actions (costs, preconditions, effects) valida
 - Unknown action id / target id produces exhaustive readable errors
 
 **Subtasks:**
-- [ ] [CS] ActionDefinition + requirement/effect DSL model
-- [ ] [CS] Validator pipeline producing ordered failure reasons
-- [ ] [CS] Transactional apply + clock advance + journal write
-- [ ] [CS] Evaluator tests for every kind (incl. atomicity & clamp interplay)
+- [x] [CS] ActionDefinition + requirement/effect DSL model
+- [x] [CS] Validator pipeline producing ordered failure reasons
+- [x] [CS] Transactional apply + clock advance + journal write
+- [x] [CS] Evaluator tests for every kind (incl. atomicity & clamp interplay)
 
 _Depends on: M1-03_
 
@@ -256,9 +256,9 @@ As the engine, I need an explicit turn pipeline so UI and AI stages plug into de
 - Every transition writes a journal entry carrying the correlation id
 
 **Subtasks:**
-- [ ] [CS] GameLoop with stage delegates + TurnResult/TurnError types
-- [ ] [CS] Recovery routing (no unhandled exceptions escape the loop)
-- [ ] [CS] Headless harness used by integration tests
+- [x] [CS] GameLoop with stage delegates + TurnResult/TurnError types
+- [x] [CS] Recovery routing (no unhandled exceptions escape the loop)
+- [x] [CS] Headless harness used by integration tests
 
 _Depends on: M1-04_
 
@@ -274,9 +274,9 @@ As the engine, I need an append-only journal so saves, AI context, debugging and
 - Replay: re-applying the journal from day 0 reproduces the state hash
 
 **Subtasks:**
-- [ ] [CS] Journal store (append-only) + typed payload records
-- [ ] [CS] Query API + pinned/rolling classification
-- [ ] [CS] Replay tool used by tests (state-hash comparison)
+- [x] [CS] Journal store (append-only) + typed payload records
+- [x] [CS] Query API + pinned/rolling classification
+- [x] [CS] Replay tool used by tests (state-hash comparison)
 
 _Depends on: M1-05_
 
@@ -291,8 +291,8 @@ As a developer, I want a small C#-authored world so the whole engine is exercisa
 - Fixture lives in the test project and runs in milliseconds
 
 **Subtasks:**
-- [ ] [CS] DemoWorld builder with entities + actions + one goal
-- [ ] [CS] Scripted-strategy playthrough integration test
+- [x] [CS] DemoWorld builder with entities + actions + one goal
+- [x] [CS] Scripted-strategy playthrough integration test
 
 _Depends on: M1-05_
 

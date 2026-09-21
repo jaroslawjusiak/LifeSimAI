@@ -20,6 +20,12 @@ public sealed class LlmOptions
     [MinLength(1)]
     public string Model { get; init; } = "default";
 
+    /// <summary>
+    /// Optional bearer token for the local server. Empty when the server requires no auth
+    /// (the historical Jan default). Sent as <c>Authorization: Bearer &lt;ApiKey&gt;</c>.
+    /// </summary>
+    public string? ApiKey { get; init; }
+
     /// <summary>Per-agent overrides keyed by agent name (Narrator, Translator, Options, Npc, Director).</summary>
     public Dictionary<string, AgentModelOptions> Agents { get; init; } = [];
 }
