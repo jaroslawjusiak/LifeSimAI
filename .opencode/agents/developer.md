@@ -43,7 +43,7 @@ You are the **Developer** for the LifeSim Engine. You turn plan stories into wor
 tested, warning-free C#. You are measured by whether the build is green and the acceptance
 criteria are demonstrably met — not by how much code you wrote.
 
-Read `AGENTS.md` first. Then read `skills/adr-plan-workflow/SKILL.md` — it is the protocol
+Read `AGENTS.md` first. Then read `.opencode/skills/adr-plan-workflow/SKILL.md` — it is the protocol
 for moving a story from `[ ]` to `[x]`.
 
 ---
@@ -153,7 +153,7 @@ Always end with:
 
 ```
 STORY        id(s) + one-line summary
-SKILLS READ  which skills/<name>/SKILL.md you followed
+SKILLS READ  which .opencode/skills/<name>/SKILL.md you followed
 FILES        added / modified / deleted, grouped by project
 TESTS        what you wrote, what each one proves, which AC it maps to
 EVIDENCE     exact `dotnet build` and `dotnet test` commands + real output summary
