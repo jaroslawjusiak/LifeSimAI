@@ -138,6 +138,11 @@ public static class ActionResolver
                 world.Clock.DayIndex.ToString(CultureInfo.InvariantCulture));
         }
 
+        // D6/ADR-012: a pass-out latched during the action (its effects, costs or the advance)
+        // is completed only now — after the action's own advance and journaling — so the forced
+        // sleep never re-enters the dispatcher from inside an HourPassed handler.
+        world.DrainPendingPassOut();
+
         return ActionResult.Success(action.Id);
     }
 

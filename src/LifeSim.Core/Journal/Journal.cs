@@ -33,6 +33,9 @@ public static class JournalEntryTypes
 
     /// <summary>A new day started.</summary>
     public const string DayStarted = "DayStarted";
+
+    /// <summary>The player passed out and was forced to sleep. Payload is "&lt;statId&gt;:&lt;sleptHours&gt;".</summary>
+    public const string PassOut = "PassOut";
 }
 
 /// <summary>

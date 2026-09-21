@@ -1,7 +1,10 @@
 using System.Globalization;
 using System.Text;
 using LifeSim.Core.Actions;
+using LifeSim.Core.Diagnostics;
 using LifeSim.Core.Journal;
+using LifeSim.Core.Rules;
+using LifeSim.Core.Stats;
 using LifeSim.Core.Time;
 
 namespace LifeSim.Core.Entities;
@@ -19,6 +22,8 @@ public sealed class WorldState
     private readonly Dictionary<string, SkillDef> _skills;
     private readonly Dictionary<string, ActionDefinition> _actions;
     private readonly GameClockEventDispatcher _clockDispatcher = new();
+    private readonly WorldRules _rules;
+    private string? _pendingPassOutStatId;
 
     public WorldState(
         Player player,
@@ -27,7 +32,8 @@ public sealed class WorldState
         IEnumerable<Item> items,
         IEnumerable<SkillDef> skills,
         IEnumerable<ActionDefinition> actions,
-        GameClock? initialClock = null)
+        GameClock? initialClock = null,
+        WorldRules? rules = null)
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
 
@@ -37,6 +43,7 @@ public sealed class WorldState
         _skills = Index(skills, "skill");
         _actions = Index(actions, "action");
 
+        _rules = rules ?? WorldRules.Default;
         Clock = initialClock ?? new GameClock(0, 8, 0);
         Flags = [];
         Unlocks = [];
@@ -47,6 +54,11 @@ public sealed class WorldState
         // Subscribed exactly once, at construction; the dispatcher is private so this is the only
         // owner of the advance and no new public engine API is introduced.
         _clockDispatcher.HourPassed += Player.Stats.ApplyHourPassed;
+
+        // D6/ADR-012: a PassOut crossing only *announces* itself here and mutates nothing, so it
+        // can never re-enter the dispatcher from inside the HourPassed callback above. The
+        // consequence is drained by ActionResolver.Apply after its own advance completes.
+        Player.Stats.StatCritical += OnPlayerStatCritical;
     }
 
     public Player Player { get; }
@@ -93,6 +105,64 @@ public sealed class WorldState
         var (next, boundariesCrossed, dayStarted) = _clockDispatcher.Advance(Clock, minutes);
         Clock = next;
         return (boundariesCrossed, dayStarted);
+    }
+
+    /// <summary>
+    /// Latches a pending pass-out announced by <see cref="StatSet.StatCritical"/> and mutates
+    /// nothing: completing the consequence from inside a clock callback would re-enter the
+    /// dispatcher (ADR-011/ADR-012).
+    /// </summary>
+    private void OnPlayerStatCritical(StatCriticalEventArgs args)
+    {
+        if (args.Consequence == StatConsequence.PassOut)
+        {
+            _pendingPassOutStatId = args.StatId;
+        }
+    }
+
+    /// <summary>
+    /// Completes a latched pass-out (ADR-012): advances the clock by <see cref="WorldRules.ForcedSleepHours"/>
+    /// hours through the same dispatcher, so exactly one decay tick fires per boundary crossed and
+    /// no manual <c>ApplyHourPassed</c> loop is used; applies the mood penalty exactly once; and
+    /// journals one <see cref="JournalEntryTypes.PassOut"/> entry (plus a
+    /// <see cref="JournalEntryTypes.DayStarted"/> entry when the sleep rolls the day).
+    /// </summary>
+    internal void DrainPendingPassOut()
+    {
+        var statId = _pendingPassOutStatId;
+        if (statId is null)
+        {
+            return;
+        }
+
+        // Clear before the forced-sleep advance: a crossing raised during the sleep then latches a
+        // *new* pending pass-out for the next drain instead of re-draining this one (no recursion).
+        _pendingPassOutStatId = null;
+
+        var passOutClock = Clock;
+        var sleptHours = _rules.ForcedSleepHours;
+
+        var (_, dayStarted) = AdvanceClock(sleptHours * GameClock.MinutesPerHour);
+
+        if (_rules.PassOutMoodPenalty != 0m && Player.Stats.Get(_rules.PassOutMoodStatId) is not null)
+        {
+            Player.Stats.ApplyDelta(_rules.PassOutMoodStatId, _rules.PassOutMoodPenalty);
+        }
+
+        Journal.Append(
+            TurnCorrelation.Current ?? string.Empty,
+            passOutClock,
+            JournalEntryTypes.PassOut,
+            $"{statId}:{sleptHours.ToString(CultureInfo.InvariantCulture)}");
+
+        if (dayStarted)
+        {
+            Journal.Append(
+                TurnCorrelation.Current ?? string.Empty,
+                Clock,
+                JournalEntryTypes.DayStarted,
+                Clock.DayIndex.ToString(CultureInfo.InvariantCulture));
+        }
     }
 
     /// <summary>
